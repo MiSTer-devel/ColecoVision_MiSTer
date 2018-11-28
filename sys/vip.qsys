@@ -505,62 +505,6 @@
          type = "String";
       }
    }
-   element vip
-   {
-      datum _originalDeviceFamily
-      {
-         value = "Cyclone V";
-         type = "String";
-      }
-   }
-   element vip
-   {
-      datum _originalDeviceFamily
-      {
-         value = "Cyclone V";
-         type = "String";
-      }
-   }
-   element vip
-   {
-      datum _originalDeviceFamily
-      {
-         value = "Cyclone V";
-         type = "String";
-      }
-   }
-   element vip
-   {
-      datum _originalDeviceFamily
-      {
-         value = "Cyclone V";
-         type = "String";
-      }
-   }
-   element vip
-   {
-      datum _originalDeviceFamily
-      {
-         value = "Cyclone V";
-         type = "String";
-      }
-   }
-   element vip
-   {
-      datum _originalDeviceFamily
-      {
-         value = "Cyclone V";
-         type = "String";
-      }
-   }
-   element vip
-   {
-      datum _originalDeviceFamily
-      {
-         value = "Cyclone V";
-         type = "String";
-      }
-   }
 }
 ]]></parameter>
  <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
@@ -586,8 +530,6 @@
  <interface name="finish" internal="Reset_Source.reset_cold_req" />
  <interface name="hdmi" internal="Output.Output" type="conduit" dir="end" />
  <interface name="in" internal="Input.input" type="conduit" dir="end" />
- <interface name="out_mix_0_Output" internal="Output.Output1" />
- <interface name="out_mix_0_input" internal="Output.input1" />
  <interface name="ram1" internal="HPS.f2h_sdram1_data" type="avalon" dir="end" />
  <interface name="ram2" internal="HPS.f2h_sdram2_data" type="avalon" dir="end" />
  <interface name="ramclk1" internal="HPS.f2h_sdram1_clock" type="clock" dir="end" />
@@ -597,13 +539,14 @@
    internal="Reset_Source.reset_ctl"
    type="conduit"
    dir="end" />
+ <interface name="uart" internal="HPS.uart1" type="conduit" dir="end" />
  <module name="Controller" kind="avalon_combiner" version="17.0" enabled="1" />
  <module name="Frame_Buffer" kind="alt_vip_cl_vfb" version="17.0" enabled="1">
   <parameter name="AUTO_DEVICE" value="5CSEBA6U23I7" />
   <parameter name="AUTO_DEVICE_SPEEDGRADE" value="7" />
   <parameter name="BITS_PER_SYMBOL" value="8" />
   <parameter name="BURST_ALIGNMENT" value="1" />
-  <parameter name="CLOCKS_ARE_SEPARATE" value="0" />
+  <parameter name="CLOCKS_ARE_SEPARATE" value="1" />
   <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
   <parameter name="CONTROLLED_DROP_REPEAT" value="0" />
   <parameter name="DROP_FRAMES" value="1" />
@@ -772,8 +715,8 @@
   <parameter name="TRACE_PinMuxing" value="Unused" />
   <parameter name="UART0_Mode" value="N/A" />
   <parameter name="UART0_PinMuxing" value="Unused" />
-  <parameter name="UART1_Mode" value="N/A" />
-  <parameter name="UART1_PinMuxing" value="Unused" />
+  <parameter name="UART1_Mode" value="Full" />
+  <parameter name="UART1_PinMuxing" value="FPGA" />
   <parameter name="USB0_Mode" value="N/A" />
   <parameter name="USB0_PinMuxing" value="Unused" />
   <parameter name="USB1_Mode" value="N/A" />
@@ -880,7 +823,7 @@
  <module name="Scaler" kind="alt_vip_cl_scl" version="17.0" enabled="1">
   <parameter name="ALGORITHM_NAME" value="POLYPHASE" />
   <parameter name="ALWAYS_DOWNSCALE" value="0" />
-  <parameter name="ARE_IDENTICAL" value="1" />
+  <parameter name="ARE_IDENTICAL" value="0" />
   <parameter name="AUTO_DEVICE" value="5CSEBA6U23I7" />
   <parameter name="AUTO_DEVICE_SPEEDGRADE" value="7" />
   <parameter name="BITS_PER_SYMBOL" value="8" />
@@ -890,7 +833,7 @@
   <parameter name="ENABLE_FIR" value="0" />
   <parameter name="EXTRA_PIPELINING" value="1" />
   <parameter name="FAMILY" value="Cyclone V" />
-  <parameter name="H_BANKS" value="1" />
+  <parameter name="H_BANKS" value="2" />
   <parameter name="H_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
   <parameter name="H_FRACTION_BITS" value="7" />
   <parameter name="H_FUNCTION" value="LANCZOS_3" />
@@ -901,8 +844,8 @@
   <parameter name="H_TAPS" value="4" />
   <parameter name="IS_420" value="0" />
   <parameter name="IS_422" value="0" />
-  <parameter name="LIMITED_READBACK" value="0" />
-  <parameter name="LOAD_AT_RUNTIME" value="0" />
+  <parameter name="LIMITED_READBACK" value="1" />
+  <parameter name="LOAD_AT_RUNTIME" value="1" />
   <parameter name="MAX_IN_HEIGHT" value="1080" />
   <parameter name="MAX_IN_WIDTH" value="1920" />
   <parameter name="MAX_OUT_HEIGHT" value="1080" />
@@ -914,13 +857,13 @@
   <parameter name="SYMBOLS_IN_PAR" value="3" />
   <parameter name="SYMBOLS_IN_SEQ" value="1" />
   <parameter name="USER_PACKET_FIFO_DEPTH" value="0" />
-  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
-  <parameter name="V_BANKS" value="1" />
+  <parameter name="USER_PACKET_SUPPORT" value="DISCARD" />
+  <parameter name="V_BANKS" value="2" />
   <parameter name="V_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
   <parameter name="V_FRACTION_BITS" value="7" />
   <parameter name="V_FUNCTION" value="LANCZOS_2" />
   <parameter name="V_INTEGER_BITS" value="1" />
-  <parameter name="V_PHASES" value="32" />
+  <parameter name="V_PHASES" value="16" />
   <parameter name="V_SIGNED" value="1" />
   <parameter name="V_SYMMETRIC" value="0" />
   <parameter name="V_TAPS" value="4" />
@@ -1089,11 +1032,6 @@
    kind="clock"
    version="17.0"
    start="HPS.h2f_user0_clock"
-   end="Frame_Buffer.main_clock" />
- <connection
-   kind="clock"
-   version="17.0"
-   start="HPS.h2f_user0_clock"
    end="Scaler.main_clock" />
  <connection
    kind="clock"
@@ -1105,6 +1043,16 @@
    version="17.0"
    start="HPS.h2f_user0_clock"
    end="Video_Output.main_clock" />
+ <connection
+   kind="clock"
+   version="17.0"
+   start="HPS.h2f_user0_clock"
+   end="Frame_Buffer.main_clock" />
+ <connection
+   kind="clock"
+   version="17.0"
+   start="HPS.h2f_user0_clock"
+   end="Frame_Buffer.mem_clock" />
  <connection
    kind="conduit"
    version="17.0"
@@ -1162,6 +1110,11 @@
    version="17.0"
    start="Reset_Source.reset_sys"
    end="Video_Output.main_reset" />
+ <connection
+   kind="reset"
+   version="17.0"
+   start="Reset_Source.reset_sys"
+   end="Frame_Buffer.mem_reset" />
  <connection
    kind="reset"
    version="17.0"
