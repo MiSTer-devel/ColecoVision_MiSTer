@@ -17,8 +17,8 @@ package sn76489_comp_pack is
   component sn76489_attenuator
     port (
       attenuation_i : in  std_logic_vector(0 to 3);
-      factor_i      : in  signed(0 to 1);
-      product_o     : out signed(0 to 7)
+      factor_i      : in  std_logic;
+      product_o     : out std_logic_vector(0 to 7)
     );
   end component;
 
@@ -31,7 +31,7 @@ package sn76489_comp_pack is
       d_i      : in  std_logic_vector(0 to 7);
       r2_i     : in  std_logic;
       ff_o     : out std_logic;
-      tone_o   : out signed(0 to 7)
+      tone_o   : out std_logic_vector(0 to 7)
     );
   end component;
 
@@ -44,7 +44,7 @@ package sn76489_comp_pack is
       d_i        : in  std_logic_vector(0 to 7);
       r2_i       : in  std_logic;
       tone3_ff_i : in  std_logic;
-      noise_o    : out signed(0 to 7)
+      noise_o    : out std_logic_vector(0 to 7)
     );
   end component;
 
@@ -89,7 +89,7 @@ package sn76489_comp_pack is
       we_n_i     : in  std_logic;
       ready_o    : out std_logic;
       d_i        : in  std_logic_vector(0 to 7);
-      aout_o     : out signed(0 to 7)
+      aout_o     : out std_logic_vector(0 to 7)
     );
   end component;
 

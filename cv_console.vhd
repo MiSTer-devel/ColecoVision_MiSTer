@@ -56,8 +56,9 @@
 -------------------------------------------------------------------------------
 
 library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL; 
 
 entity cv_console is
 
@@ -86,8 +87,9 @@ entity cv_console is
     bios_rom_ce_n_o : out std_logic;
     bios_rom_d_i    : in  std_logic_vector( 7 downto 0);
     -- CPU RAM Interface ------------------------------------------------------
-    cpu_ram_a_o     : out std_logic_vector( 9 downto 0);
+    cpu_ram_a_o     : out std_logic_vector(14 downto 0);
     cpu_ram_ce_n_o  : out std_logic;
+    cpu_ram_rd_n_o  : out std_logic;
     cpu_ram_we_n_o  : out std_logic;
     cpu_ram_d_i     : in  std_logic_vector( 7 downto 0);
     cpu_ram_d_o     : out std_logic_vector( 7 downto 0);
@@ -97,11 +99,13 @@ entity cv_console is
     vram_d_o        : out std_logic_vector( 7 downto 0);
     vram_d_i        : in  std_logic_vector( 7 downto 0);
     -- Cartridge ROM Interface ------------------------------------------------
-    cart_a_o        : out std_logic_vector(14 downto 0);
+    cart_a_o        : out std_logic_vector(19 downto 0);
+    cart_pages_i    : in  std_logic_vector( 5 downto 0);
     cart_en_80_n_o  : out std_logic;
     cart_en_a0_n_o  : out std_logic;
     cart_en_c0_n_o  : out std_logic;
     cart_en_e0_n_o  : out std_logic;
+    cart_rd         : out std_logic;
     cart_d_i        : in  std_logic_vector( 7 downto 0);
     -- RGB Video Interface ----------------------------------------------------
     col_o           : out std_logic_vector( 3 downto 0);
@@ -115,7 +119,7 @@ entity cv_console is
     vblank_o        : out std_logic;
     comp_sync_n_o   : out std_logic;
     -- Audio Interface --------------------------------------------------------
-    audio_o         : out signed(7 downto 0)
+    audio_o         : out std_logic_vector(10 downto 0)
   );
 
 end cv_console;
@@ -135,39 +139,40 @@ use work.sn76489_comp_pack.sn76489_top;
 
 architecture struct of cv_console is
 
-  component T80a
-    generic(
-      Mode : integer := 0     -- 0 => Z80, 1 => Fast Z80, 2 => 8080, 3 => GB
-    );
-    port(
-      RESET_n    : in  std_logic;
-      CLK_n      : in  std_logic;
-      CLK_EN_SYS : in  std_logic;
-      WAIT_n     : in  std_logic;
-      INT_n      : in  std_logic;
-      NMI_n      : in  std_logic;
-      BUSRQ_n    : in  std_logic;
-      M1_n       : out std_logic;
-      MREQ_n     : out std_logic;
-      IORQ_n     : out std_logic;
-      RD_n       : out std_logic;
-      WR_n       : out std_logic;
-      RFSH_n     : out std_logic;
-      HALT_n     : out std_logic;
-      BUSAK_n    : out std_logic;
-      A          : out std_logic_vector(15 downto 0);
-      D_i        : in  std_logic_vector( 7 downto 0);
-      D_o        : out std_logic_vector( 7 downto 0)
+  component YM2149
+  port (
+    CLK         : in  std_logic;
+    CE          : in  std_logic;
+    RESET       : in  std_logic;
+    BDIR        : in  std_logic; -- Bus Direction (0 - read , 1 - write)
+    BC          : in  std_logic; -- Bus control
+    DI          : in  std_logic_vector(7 downto 0);
+    DO          : out std_logic_vector(7 downto 0);
+    CHANNEL_A   : out std_logic_vector(7 downto 0);
+    CHANNEL_B   : out std_logic_vector(7 downto 0);
+    CHANNEL_C   : out std_logic_vector(7 downto 0);
+
+    SEL         : in  std_logic;
+    MODE        : in  std_logic;
+
+    ACTIVE      : out std_logic_vector(5 downto 0);
+
+    IOA_in      : in  std_logic_vector(7 downto 0);
+    IOA_out     : out std_logic_vector(7 downto 0);
+
+    IOB_in      : in  std_logic_vector(7 downto 0);
+    IOB_out     : out std_logic_vector(7 downto 0)
     );
   end component;
 
   signal por_n_s          : std_logic;
   signal reset_n_s        : std_logic;
 
-  signal clk_en_3m58_s    : std_logic;
+  signal clk_en_3m58_p_s  : std_logic;
+  signal clk_en_3m58_n_s  : std_logic;
 
   -- CPU signals
-  signal clk_en_cpu_s     : std_logic;
+  signal wait_n_s         : std_logic;
   signal nmi_n_s          : std_logic;
   signal iorq_n_s         : std_logic;
   signal m1_n_s           : std_logic;
@@ -185,6 +190,15 @@ architecture struct of cv_console is
 
   -- SN76489 signal
   signal psg_ready_s      : std_logic;
+  signal psg_audio_s      : std_logic_vector( 7 downto 0);
+
+  -- AY-8910 signal
+  signal ay_d_s           : std_logic_vector( 7 downto 0);
+  signal ay_ch_a_s        : std_logic_vector( 7 downto 0);
+  signal ay_ch_b_s        : std_logic_vector( 7 downto 0);
+  signal ay_ch_c_s        : std_logic_vector( 7 downto 0);
+
+  signal audio_mix        : std_logic_vector( 9 downto 0);
 
   -- Controller signals
   signal d_from_ctrl_s    : std_logic_vector( 7 downto 0);
@@ -195,6 +209,9 @@ architecture struct of cv_console is
   signal vdp_r_n_s,
          vdp_w_n_s        : std_logic;
   signal psg_we_n_s       : std_logic;
+  signal ay_addr_we_n_s   : std_logic;
+  signal ay_data_we_n_s   : std_logic;
+  signal ay_data_rd_n_s   : std_logic;
   signal ctrl_r_n_s       : std_logic;
   signal ctrl_en_key_n_s,
          ctrl_en_joy_n_s  : std_logic;
@@ -202,7 +219,7 @@ architecture struct of cv_console is
          cart_en_a0_n_s,
          cart_en_c0_n_s,
          cart_en_e0_n_s   : std_logic;
-
+  signal cart_page_s      : std_logic_vector(5 downto 0);
   -- misc signals
   signal vdd_s            : std_logic;
 
@@ -213,6 +230,7 @@ architecture struct of cv_console is
 begin
 
   vdd_s <= '1';
+  audio_o <= ('0'&psg_audio_s&"00") + ay_ch_a_s + ay_ch_b_s + ay_ch_c_s;
 
   -----------------------------------------------------------------------------
   -- Reset generation
@@ -225,7 +243,6 @@ begin
   por_n_o   <= por_n_s;
   reset_n_s <= por_n_s and reset_n_i;
 
-
   -----------------------------------------------------------------------------
   -- Clock generation
   -----------------------------------------------------------------------------
@@ -234,24 +251,23 @@ begin
       clk_i         => clk_i,
       clk_en_10m7_i => clk_en_10m7_i,
       reset_n_i     => reset_n_s,
-      clk_en_3m58_o => clk_en_3m58_s
+      clk_en_3m58_p_o => clk_en_3m58_p_s,
+      clk_en_3m58_n_o => clk_en_3m58_n_s
     );
-
-  clk_en_cpu_s  <= clk_en_3m58_s and psg_ready_s and not m1_wait_q;
-
 
   -----------------------------------------------------------------------------
   -- T80 CPU
   -----------------------------------------------------------------------------
-  t80a_b : T80a
+  t80a_b : work.T80pa
     generic map (
       Mode       => 0
     )
     port map(
       RESET_n    => reset_n_s,
-      CLK_n      => clk_i,
-      CLK_EN_SYS => clk_en_cpu_s,
-      WAIT_n     => vdd_s,
+      CLK        => clk_i,
+      CEN_p      => clk_en_3m58_p_s,
+      CEN_n      => clk_en_3m58_n_s,
+      WAIT_n     => wait_n_s,
       INT_n      => vdd_s,
       NMI_n      => nmi_n_s,
       BUSRQ_n    => vdd_s,
@@ -264,10 +280,34 @@ begin
       HALT_n     => open,
       BUSAK_n    => open,
       A          => a_s,
-      D_i        => d_to_cpu_s,
-      D_o        => d_from_cpu_s
+      DI         => d_to_cpu_s,
+      DO         => d_from_cpu_s
     );
 
+  ym2149_inst: YM2149
+  port map (
+    CLK         => clk_i,
+    CE          => clk_en_3m58_p_s,
+    RESET       => not reset_n_s,
+    BDIR        => not ay_addr_we_n_s or not ay_data_we_n_s,
+    BC          => not ay_addr_we_n_s or not ay_data_rd_n_s,
+    DI          => d_from_cpu_s,
+    DO          => ay_d_s,
+    CHANNEL_A   => ay_ch_a_s,
+    CHANNEL_B   => ay_ch_b_s,
+    CHANNEL_C   => ay_ch_c_s,
+
+    SEL         => '0',
+    MODE        => '0',
+
+    ACTIVE      => open,
+
+    IOA_in      => (others => '0'),
+    IOA_out     => open,
+
+    IOB_in      => (others => '0'),
+    IOB_out     => open
+    );
 
   -----------------------------------------------------------------------------
   -- Process m1_wait
@@ -280,11 +320,14 @@ begin
     if reset_n_s = '0' or m1_n_s = '1' then
       m1_wait_q   <= '0';
     elsif clk_i'event and clk_i = '1' then
-      if clk_en_3m58_s = '1' then
+      if clk_en_3m58_p_s = '1' then
         m1_wait_q <= not m1_wait_q;
       end if;
     end if;
   end process m1_wait;
+
+  wait_n_s  <= psg_ready_s and not m1_wait_q;
+
   --
   -----------------------------------------------------------------------------
 
@@ -333,13 +376,13 @@ begin
     )
     port map (
       clock_i    => clk_i,
-      clock_en_i => clk_en_3m58_s,
+      clock_en_i => clk_en_3m58_p_s,
       res_n_i    => reset_n_s,
       ce_n_i     => psg_we_n_s,
       we_n_i     => psg_we_n_s,
       ready_o    => psg_ready_s,
       d_i        => d_from_cpu_s,
-      aout_o     => audio_o
+      aout_o     => psg_audio_s
     );
 
 
@@ -349,7 +392,7 @@ begin
   ctrl_b : cv_ctrl
     port map (
       clk_i           => clk_i,
-      clk_en_3m58_i   => clk_en_3m58_s,
+      clk_en_3m58_i   => clk_en_3m58_p_s,
       reset_n_i       => reset_n_s,
       ctrl_en_key_n_i => ctrl_en_key_n_s,
       ctrl_en_joy_n_i => ctrl_en_joy_n_s,
@@ -372,7 +415,12 @@ begin
   -----------------------------------------------------------------------------
   addr_dec_b : cv_addr_dec
     port map (
+      clk_i           => clk_i,
+      reset_n_i       => reset_n_i,
       a_i             => a_s,
+      d_i             => d_from_cpu_s,
+      cart_pages_i    => cart_pages_i,
+      cart_page_o     => cart_page_s,
       iorq_n_i        => iorq_n_s,
       rd_n_i          => rd_n_s,
       wr_n_i          => wr_n_s,
@@ -383,6 +431,9 @@ begin
       vdp_r_n_o       => vdp_r_n_s,
       vdp_w_n_o       => vdp_w_n_s,
       psg_we_n_o      => psg_we_n_s,
+      ay_addr_we_n_o  => ay_addr_we_n_s,
+      ay_data_we_n_o  => ay_data_we_n_s,
+      ay_data_rd_n_o  => ay_data_rd_n_s,
       ctrl_r_n_o      => ctrl_r_n_s,
       ctrl_en_key_n_o => ctrl_en_key_n_s,
       ctrl_en_joy_n_o => ctrl_en_joy_n_s,
@@ -395,10 +446,12 @@ begin
   bios_rom_ce_n_o <= bios_rom_ce_n_s;
   cpu_ram_ce_n_o  <= ram_ce_n_s;
   cpu_ram_we_n_o  <= wr_n_s;
+  cpu_ram_rd_n_o  <= rd_n_s;
   cart_en_80_n_o  <= cart_en_80_n_s;
   cart_en_a0_n_o  <= cart_en_a0_n_s;
   cart_en_c0_n_o  <= cart_en_c0_n_s;
   cart_en_e0_n_o  <= cart_en_e0_n_s;
+  cart_rd <= not (cart_en_80_n_s and cart_en_a0_n_s and cart_en_c0_n_s and cart_en_e0_n_s);
 
 
   -----------------------------------------------------------------------------
@@ -414,11 +467,13 @@ begin
       cart_en_a0_n_i  => cart_en_a0_n_s,
       cart_en_c0_n_i  => cart_en_c0_n_s,
       cart_en_e0_n_i  => cart_en_e0_n_s,
+      ay_data_rd_n_i  => ay_data_rd_n_s,
       bios_rom_d_i    => bios_rom_d_i,
       cpu_ram_d_i     => cpu_ram_d_i,
       vdp_d_i         => d_from_vdp_s,
       ctrl_d_i        => d_from_ctrl_s,
       cart_d_i        => cart_d_i,
+      ay_d_i          => ay_d_s,
       d_o             => d_to_cpu_s
     );
 
@@ -427,9 +482,9 @@ begin
   -- Misc outputs
   -----------------------------------------------------------------------------
   bios_rom_a_o <= a_s(12 downto 0);
-  cpu_ram_a_o  <= a_s( 9 downto 0);
+  cpu_ram_a_o  <= a_s(14 downto 0);
   cpu_ram_d_o  <= d_from_cpu_s;
-  cart_a_o     <= a_s(14 downto 0);
+  cart_a_o     <= cart_page_s & a_s(13 downto 0);
 
 
   -- pragma translate_off

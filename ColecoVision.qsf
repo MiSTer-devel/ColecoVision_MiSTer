@@ -354,9 +354,10 @@ set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
 set_global_assignment -name CDF_FILE jtag.cdf
 set_global_assignment -name QIP_FILE sys/sys.qip
 set_global_assignment -name QSYS_FILE sys/vip.qsys
-set_global_assignment -name VHDL_FILE dpram.vhd
-set_global_assignment -name VHDL_FILE spram.vhd
-set_global_assignment -name VERILOG_FILE sprom.v
+set_global_assignment -name QIP_FILE T80/t80.qip
+set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
+set_global_assignment -name VHDL_FILE bram.vhd
+set_global_assignment -name SYSTEMVERILOG_FILE YM2149.sv
 set_global_assignment -name VHDL_FILE "sn76489/sn76489_comp_pack-p.vhd"
 set_global_assignment -name VHDL_FILE sn76489/sn76489_clock_div.vhd
 set_global_assignment -name VHDL_FILE sn76489/sn76489_latch_ctrl.vhd
@@ -364,12 +365,6 @@ set_global_assignment -name VHDL_FILE sn76489/sn76489_noise.vhd
 set_global_assignment -name VHDL_FILE sn76489/sn76489_tone.vhd
 set_global_assignment -name VHDL_FILE sn76489/sn76489_attenuator.vhd
 set_global_assignment -name VHDL_FILE sn76489/sn76489_top.vhd
-set_global_assignment -name VHDL_FILE T80/T80_Pack.vhd
-set_global_assignment -name VHDL_FILE T80/T80_ALU.vhd
-set_global_assignment -name VHDL_FILE T80/T80_MCode.vhd
-set_global_assignment -name VHDL_FILE T80/T80_Reg.vhd
-set_global_assignment -name VHDL_FILE T80/T80.vhd
-set_global_assignment -name VHDL_FILE T80/T80a.vhd
 set_global_assignment -name VHDL_FILE "vdp18/vdp18_pack-p.vhd"
 set_global_assignment -name VHDL_FILE vdp18/vdp18_pattern.vhd
 set_global_assignment -name VHDL_FILE vdp18/vdp18_sprite.vhd

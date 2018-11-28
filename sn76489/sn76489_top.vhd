@@ -56,8 +56,9 @@
 -------------------------------------------------------------------------------
 
 library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL; 
 
 entity sn76489_top is
 
@@ -72,7 +73,7 @@ entity sn76489_top is
     we_n_i     : in  std_logic;
     ready_o    : out std_logic;
     d_i        : in  std_logic_vector(0 to 7);
-    aout_o     : out signed(0 to 7)
+    aout_o     : out std_logic_vector(0 to 7)
   );
 
 end sn76489_top;
@@ -95,7 +96,7 @@ architecture struct of sn76489_top is
   signal tone1_s,
          tone2_s,
          tone3_s,
-         noise_s     : signed(0 to 7);
+         noise_s     : std_logic_vector(0 to 7);
 
   signal tone3_ff_s  : std_logic;
 

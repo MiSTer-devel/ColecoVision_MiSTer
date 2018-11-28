@@ -48,6 +48,8 @@ module emu
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
+	output        VGA_F1,
+	output [1:0]  VGA_SL,
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -94,11 +96,19 @@ module emu
 	output        SDRAM_nCS,
 	output        SDRAM_nCAS,
 	output        SDRAM_nRAS,
-	output        SDRAM_nWE
+	output        SDRAM_nWE,
+
+	input         UART_CTS,
+	output        UART_RTS,
+	input         UART_RXD,
+	output        UART_TXD,
+	output        UART_DTR,
+	input         UART_DSR
 );
 
+assign {UART_RTS, UART_TXD, UART_DTR} = 0;
+
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
-assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
  
 assign LED_USER  = ioctl_download;
@@ -108,21 +118,17 @@ assign LED_POWER = 0;
 assign VIDEO_ARX = status[1] ? 8'd16 : 8'd4;
 assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3; 
 
-wire [1:0] scale = status[8:7];
-
 `include "build_id.v" 
 parameter CONF_STR = {
 	"Coleco;;",
 	"-;",
-	"F,COLBIN;",
+	"F,COLBINROM;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
-	"O78,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
+	"O45,RAM Size,1KB,8KB,SGM;",
 	"T6,Reset;",
-	"-;",
-	"-;",
-	"-;",
 	"J,Fire 1,Fire 2,*,#,0,1,2,3,Purple Tr,Blue Tr;",
 	"V,v1.00.",`BUILD_DATE
 };
@@ -197,22 +203,22 @@ wire reset = RESET | status[0] | buttons[1] | status[6] | ioctl_download;
 wire [12:0] bios_a;
 wire  [7:0] bios_d;
 
-sprom #("bios.hex", 13) rom
+spram #(13,8,"bios.mif") rom
 (
 	.clock(clk_sys),
    .address(bios_a),
    .q(bios_d)
 );
 
-wire  [9:0] ram_a;
+wire [14:0] ram_a;
 wire        ram_we_n, ram_ce_n;
 wire  [7:0] ram_di;
 wire  [7:0] ram_do;
 
-spram #(10) ram
+spram #(15) ram
 (
 	.clock(clk_sys),
-	.address(ram_a),
+	.address((status[5:4] == 1) ? ram_a[12:0] : (!status[5:4]) ? ram_a[9:0] : ram_a),
 	.wren(ce_10m7 & ~(ram_we_n | ram_ce_n)),
 	.data(ram_do),
 	.q(ram_di)
@@ -232,27 +238,36 @@ spram #(14) vram
 	.q(vram_di)
 );
 
-wire [14:0] cart_a;
+wire [19:0] cart_a;
 wire  [7:0] cart_d;
+wire        cart_rd;
 
-dpram #(15) cart
+reg [24:0] last_addr;
+always @(posedge clk_sys) if(ioctl_wr) last_addr <= ioctl_addr;
+
+assign SDRAM_CLK = ~clk_sys;
+sdram sdram
 (
-	.clk_a_i(clk_sys),
-	.we_i(ioctl_wr && !ioctl_addr[24:15]),
-	.addr_a_i(ioctl_addr[14:0]),
-	.data_a_i(ioctl_dout),
+	.*,
+	.init(~pll_locked),
+	.clk(clk_sys),
 
-	.clk_b_i(clk_sys),
-	.addr_b_i(cart_a),
-	.data_b_o(cart_d)
+   .wtbt(0),
+   .addr(ioctl_download ? ioctl_addr : cart_a),
+   .rd(cart_rd),
+   .dout(cart_d),
+   .din(ioctl_dout),
+   .we(ioctl_wr),
+   .ready()
 );
+
 
 ////////////////  Console  ////////////////////////
 
-wire [7:0] audio;
-assign AUDIO_L = {audio,8'd0};
-assign AUDIO_R = {audio,8'd0};
-assign AUDIO_S = 1;
+wire [10:0] audio;
+assign AUDIO_L = {audio,5'd0};
+assign AUDIO_R = {audio,5'd0};
+assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
 assign CLK_VIDEO = clk_sys;
@@ -303,7 +318,9 @@ cv_console console
 	.vram_d_i(vram_di),
 
 	.cart_a_o(cart_a),
+   .cart_pages_i(last_addr[19:14]),
 	.cart_d_i(cart_d),
+	.cart_rd(cart_rd),
 
 	.rgb_r_o(R),
 	.rgb_g_o(G),
@@ -316,6 +333,12 @@ cv_console console
 	.audio_o(audio)
 );
 
+assign VGA_F1 = 0;
+assign VGA_SL = sl[1:0];
+
+wire [2:0] scale = status[9:7];
+wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
+
 video_mixer #(.LINE_LENGTH(290)) video_mixer
 (
 	.*,
@@ -323,7 +346,7 @@ video_mixer #(.LINE_LENGTH(290)) video_mixer
 	.ce_pix(ce_5m3),
 	.ce_pix_out(CE_PIXEL),
 
-	.scanlines({scale == 3, scale == 2}),
+	.scanlines(0),
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale==1),
 
