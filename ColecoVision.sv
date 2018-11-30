@@ -130,7 +130,7 @@ parameter CONF_STR = {
 	"O45,RAM Size,1KB,8KB,SGM;",
 	"T6,Reset;",
 	"J,Fire 1,Fire 2,*,#,0,1,2,3,Purple Tr,Blue Tr;",
-	"V,v1.00.",`BUILD_DATE
+	"V,v.",`BUILD_DATE
 };
 
 /////////////////  CLOCKS  ////////////////////////
