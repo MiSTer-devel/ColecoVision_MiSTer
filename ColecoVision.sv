@@ -123,12 +123,13 @@ parameter CONF_STR = {
 	"Coleco;;",
 	"-;",
 	"F,COLBINROM;",
+	"F,SG .Load SG-1000;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
 	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
 	"O45,RAM Size,1KB,8KB,SGM;",
-	"T6,Reset;",
+	"R0,Reset;",
 	"J,Fire 1,Fire 2,*,#,0,1,2,3,Purple Tr,Blue Tr;",
 	"V,v.",`BUILD_DATE
 };
@@ -196,7 +197,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 /////////////////  RESET  /////////////////////////
 
-wire reset = RESET | status[0] | buttons[1] | status[6] | ioctl_download;
+wire reset = RESET | status[0] | buttons[1] | ioctl_download;
 
 /////////////////  Memory  ////////////////////////
 
@@ -210,15 +211,21 @@ spram #(13,8,"bios.mif") rom
    .q(bios_d)
 );
 
-wire [14:0] ram_a;
+wire [14:0] cpu_ram_a;
 wire        ram_we_n, ram_ce_n;
 wire  [7:0] ram_di;
 wire  [7:0] ram_do;
 
+wire [14:0] ram_a = (sg1000 && dahjeeA) ? cpu_ram_a       : // 32k
+                    (status[5:4] == 1)  ? cpu_ram_a[12:0] : // 8k
+                    (status[5:4] == 0)  ? cpu_ram_a[9:0]  : // 1k
+                    (sg1000)            ? cpu_ram_a[12:0] : // SGM means 8k on SG1000
+                                          cpu_ram_a;        // SGM/32k
+
 spram #(15) ram
 (
 	.clock(clk_sys),
-	.address((status[5:4] == 1) ? ram_a[12:0] : (!status[5:4]) ? ram_a[9:0] : ram_a),
+	.address(ram_a),
 	.wren(ce_10m7 & ~(ram_we_n | ram_ce_n)),
 	.data(ram_do),
 	.q(ram_di)
@@ -261,6 +268,21 @@ sdram sdram
    .ready()
 );
 
+reg dahjeeA;
+always @(posedge clk_sys) begin
+	reg [7:0] chksum;
+	
+	if(sg1000 & ioctl_download & ioctl_wr) begin
+		if(!ioctl_addr) begin
+			chksum <= 0;
+			dahjeeA <= 0;
+		end
+		if(ioctl_addr[15:0] == 'h2000) chksum <= ioctl_dout;
+		else if(ioctl_addr[15:0] == 'h3fff) chksum <= chksum & ioctl_dout;
+	end
+	if(sg1000 && chksum == 'hFF) dahjeeA <= 1;
+end
+
 
 ////////////////  Console  ////////////////////////
 
@@ -286,12 +308,16 @@ wire [7:0] R,G,B;
 wire hblank, vblank;
 wire hsync, vsync;
 
+wire sg1000 = |ioctl_index[4:0];
+
 cv_console console
 (
 	.clk_i(clk_sys),
 	.clk_en_10m7_i(ce_10m7),
 	.reset_n_i(~reset),
 	.por_n_o(),
+   .sg1000(sg1000),
+   .dahjeeA_i(dahjeeA),
 
 	.ctrl_p1_i(ctrl_p1),
 	.ctrl_p2_i(ctrl_p2),
@@ -302,11 +328,13 @@ cv_console console
 	.ctrl_p7_i(ctrl_p7),
 	.ctrl_p8_o(ctrl_p8),
 	.ctrl_p9_i(ctrl_p9),
+   .joy0_i(~{|joya[13:6], 1'b0, joya[5:0]}),
+   .joy1_i(~{|joyb[13:6], 1'b0, joyb[5:0]}),
 
 	.bios_rom_a_o(bios_a),
 	.bios_rom_d_i(bios_d),
 
-	.cpu_ram_a_o(ram_a),
+	.cpu_ram_a_o(cpu_ram_a),
 	.cpu_ram_we_n_o(ram_we_n),
 	.cpu_ram_ce_n_o(ram_ce_n),
 	.cpu_ram_d_i(ram_di),
