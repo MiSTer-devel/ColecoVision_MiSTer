@@ -65,8 +65,6 @@ entity sn76489_noise is
 end sn76489_noise;
 
 
-use work.sn76489_comp_pack.sn76489_attenuator;
-
 architecture rtl of sn76489_noise is
 
   signal nf_q       : std_logic_vector(0 to 1);
@@ -259,7 +257,7 @@ begin
   -----------------------------------------------------------------------------
   -- The attenuator itself
   -----------------------------------------------------------------------------
-  attenuator_b : sn76489_attenuator
+  attenuator_b : work.sn76489_attenuator
     port map (
       attenuation_i => a_q,
       factor_i      => lfsr_q(0),

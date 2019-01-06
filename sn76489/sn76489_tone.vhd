@@ -64,9 +64,6 @@ entity sn76489_tone is
 
 end sn76489_tone;
 
-
-use work.sn76489_comp_pack.sn76489_attenuator;
-
 architecture rtl of sn76489_tone is
 
   signal f_q        : std_logic_vector(0 to 9);
@@ -164,7 +161,7 @@ begin
   -----------------------------------------------------------------------------
   -- The attenuator itself
   -----------------------------------------------------------------------------
-  attenuator_b : sn76489_attenuator
+  attenuator_b : work.sn76489_attenuator
     port map (
       attenuation_i => a_q,
       factor_i      => freq_ff_q,

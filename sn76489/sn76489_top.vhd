@@ -81,7 +81,6 @@ end sn76489_top;
 
 library ieee;
 use ieee.numeric_std.all;
-use work.sn76489_comp_pack.all;
 
 architecture struct of sn76489_top is
 
@@ -105,7 +104,7 @@ begin
   -----------------------------------------------------------------------------
   -- Clock Divider
   -----------------------------------------------------------------------------
-  clock_div_b : sn76489_clock_div
+  clock_div_b : work.sn76489_clock_div
     generic map (
       clock_div_16_g => clock_div_16_g
     )
@@ -120,7 +119,7 @@ begin
   -----------------------------------------------------------------------------
   -- Latch Control = CPU Interface
   -----------------------------------------------------------------------------
-  latch_ctrl_b : sn76489_latch_ctrl
+  latch_ctrl_b : work.sn76489_latch_ctrl
     port map (
       clock_i    => clock_i,
       clk_en_i   => clk_en_s,
@@ -140,7 +139,7 @@ begin
   -----------------------------------------------------------------------------
   -- Tone Channel 1
   -----------------------------------------------------------------------------
-  tone1_b : sn76489_tone
+  tone1_b : work.sn76489_tone
     port map (
       clock_i  => clock_i,
       clk_en_i => clk_en_s,
@@ -155,7 +154,7 @@ begin
   -----------------------------------------------------------------------------
   -- Tone Channel 2
   -----------------------------------------------------------------------------
-  tone2_b : sn76489_tone
+  tone2_b : work.sn76489_tone
     port map (
       clock_i  => clock_i,
       clk_en_i => clk_en_s,
@@ -170,7 +169,7 @@ begin
   -----------------------------------------------------------------------------
   -- Tone Channel 3
   -----------------------------------------------------------------------------
-  tone3_b : sn76489_tone
+  tone3_b : work.sn76489_tone
     port map (
       clock_i  => clock_i,
       clk_en_i => clk_en_s,
@@ -185,7 +184,7 @@ begin
   -----------------------------------------------------------------------------
   -- Noise Channel
   -----------------------------------------------------------------------------
-  noise_b : sn76489_noise
+  noise_b : work.sn76489_noise
     port map (
       clock_i    => clock_i,
       clk_en_i   => clk_en_s,

@@ -134,14 +134,6 @@ end cv_console;
 use std.textio.all;
 -- pragma translate_on
 
-use work.tech_comp_pack.cv_por;
-use work.cv_comp_pack.cv_clock;
-use work.cv_comp_pack.cv_ctrl;
-use work.cv_comp_pack.cv_addr_dec;
-use work.cv_comp_pack.cv_bus_mux;
-use work.vdp18_core_comp_pack.vdp18_core;
-use work.sn76489_comp_pack.sn76489_top;
-
 architecture struct of cv_console is
 
   component YM2149
@@ -248,7 +240,7 @@ begin
   -----------------------------------------------------------------------------
   -- Reset generation
   -----------------------------------------------------------------------------
-  por_b : cv_por
+  por_b : work.cv_por
     port map (
       clk_i   => clk_i,
       por_n_o => por_n_s
@@ -259,7 +251,7 @@ begin
   -----------------------------------------------------------------------------
   -- Clock generation
   -----------------------------------------------------------------------------
-  clock_b : cv_clock
+  clock_b : work.cv_clock
     port map (
       clk_i         => clk_i,
       clk_en_10m7_i => clk_en_10m7_i,
@@ -348,7 +340,7 @@ begin
   -----------------------------------------------------------------------------
   -- TMS9928A Video Display Processor
   -----------------------------------------------------------------------------
-  vdp18_b : vdp18_core
+  vdp18_b : work.vdp18_core
     generic map (
       is_pal_g      => is_pal_g,
       compat_rgb_g  => compat_rgb_g
@@ -383,7 +375,7 @@ begin
   -----------------------------------------------------------------------------
   -- SN76489 Programmable Sound Generator
   -----------------------------------------------------------------------------
-  psg_b : sn76489_top
+  psg_b : work.sn76489_top
     generic map (
       clock_div_16_g => 1
     )
@@ -402,7 +394,7 @@ begin
   -----------------------------------------------------------------------------
   -- Controller ports
   -----------------------------------------------------------------------------
-  ctrl_b : cv_ctrl
+  ctrl_b : work.cv_ctrl
     port map (
       clk_i           => clk_i,
       clk_en_3m58_i   => clk_en_3m58_p_s,
@@ -426,7 +418,7 @@ begin
   -----------------------------------------------------------------------------
   -- Address decoder
   -----------------------------------------------------------------------------
-  addr_dec_b : cv_addr_dec
+  addr_dec_b : work.cv_addr_dec
     port map (
       clk_i           => clk_i,
       reset_n_i       => reset_n_i,
@@ -478,7 +470,7 @@ begin
     else joy1_i(2) & joy1_i(3) & joy0_i(5) & joy0_i(4) & joy0_i(0) & joy0_i(1) & joy0_i(2) & joy0_i(3) when a_s(0) = '0'
     else "111" & reset_n_i & joy1_i(5) & joy1_i(4) & joy1_i(0) & joy1_i(1);
 
-  bus_mux_b : cv_bus_mux
+  bus_mux_b : work.cv_bus_mux
     port map (
       bios_rom_ce_n_i => bios_rom_ce_n_s,
       ram_ce_n_i      => ram_ce_n_s,
