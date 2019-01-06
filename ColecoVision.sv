@@ -123,10 +123,12 @@ parameter CONF_STR = {
 	"Coleco;;",
 	"-;",
 	"F,COLBINROM;",
-	"F,SG .Load SG-1000;",
+	"F,SG,Load SG-1000;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
 	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"-;",
+	"O3,Joysticks swap,No,Yes;",
 	"-;",
 	"O45,RAM Size,1KB,8KB,SGM;",
 	"R0,Reset;",
@@ -162,7 +164,7 @@ end
 wire [31:0] status;
 wire  [1:0] buttons;
 
-wire [15:0] joya, joyb;
+wire [15:0] joy0, joy1;
 wire [10:0] ps2_key;
 
 wire        ioctl_download;
@@ -191,8 +193,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.ps2_key(ps2_key),
 
-	.joystick_0(joya),
-	.joystick_1(joyb)
+	.joystick_0(joy0),
+	.joystick_1(joy1)
 );
 
 /////////////////  RESET  /////////////////////////
@@ -309,6 +311,9 @@ wire hblank, vblank;
 wire hsync, vsync;
 
 wire sg1000 = |ioctl_index[4:0];
+
+wire [15:0] joya = status[3] ? joy1 : joy0;
+wire [15:0] joyb = status[3] ? joy0 : joy1;
 
 cv_console console
 (
