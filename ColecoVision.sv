@@ -218,7 +218,7 @@ wire        ram_we_n, ram_ce_n;
 wire  [7:0] ram_di;
 wire  [7:0] ram_do;
 
-wire [14:0] ram_a = (sg1000 && dahjeeA) ? cpu_ram_a       : // 32k
+wire [14:0] ram_a = (extram)            ? cpu_ram_a       :
                     (status[5:4] == 1)  ? cpu_ram_a[12:0] : // 8k
                     (status[5:4] == 0)  ? cpu_ram_a[9:0]  : // 1k
                     (sg1000)            ? cpu_ram_a[12:0] : // SGM means 8k on SG1000
@@ -270,19 +270,12 @@ sdram sdram
    .ready()
 );
 
-reg dahjeeA;
+reg extram = 0;
 always @(posedge clk_sys) begin
-	reg [7:0] chksum;
-	
-	if(sg1000 & ioctl_download & ioctl_wr) begin
-		if(!ioctl_addr) begin
-			chksum <= 0;
-			dahjeeA <= 0;
-		end
-		if(ioctl_addr[15:0] == 'h2000) chksum <= ioctl_dout;
-		else if(ioctl_addr[15:0] == 'h3fff) chksum <= chksum & ioctl_dout;
+	if(ioctl_wr) begin
+		if(!ioctl_addr) extram <= 0;
+		if(ioctl_addr[24:13] == 1) extram <= ((!ioctl_addr[12:0]) ? sg1000 : extram) & &ioctl_dout; // 2000-3FFF on SG-1000
 	end
-	if(sg1000 && chksum == 'hFF) dahjeeA <= 1;
 end
 
 
@@ -322,7 +315,7 @@ cv_console console
 	.reset_n_i(~reset),
 	.por_n_o(),
    .sg1000(sg1000),
-   .dahjeeA_i(dahjeeA),
+   .dahjeeA_i(extram),
 
 	.ctrl_p1_i(ctrl_p1),
 	.ctrl_p2_i(ctrl_p2),

@@ -467,6 +467,7 @@ begin
   cart_en_a0_n_o  <= cart_en_a0_n_s;
   cart_en_c0_n_o  <= cart_en_c0_n_s;
   cart_en_e0_n_o  <= cart_en_e0_n_s;
+  cart_en_sg1000_n_o <= cart_en_sg1000_n_s;
   cart_rd <= not (cart_en_80_n_s and cart_en_a0_n_s and cart_en_c0_n_s and cart_en_e0_n_s and cart_en_sg1000_n_s);
 
   -----------------------------------------------------------------------------

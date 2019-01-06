@@ -106,6 +106,7 @@ begin
                 cart_pages_i,
                 bios_en,
                 sg1000,
+                dahjeeA_i,
                 megacart_en,
                 megacart_page)
     variable mux_v : std_logic_vector(2 downto 0);
