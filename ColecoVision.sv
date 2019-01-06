@@ -133,7 +133,7 @@ parameter CONF_STR = {
 	"O45,RAM Size,1KB,8KB,SGM;",
 	"R0,Reset;",
 	"J,Fire 1,Fire 2,*,#,0,1,2,3,Purple Tr,Blue Tr;",
-	"V,v.",`BUILD_DATE
+	"V,v",`BUILD_DATE
 };
 
 /////////////////  CLOCKS  ////////////////////////
@@ -251,8 +251,8 @@ wire [19:0] cart_a;
 wire  [7:0] cart_d;
 wire        cart_rd;
 
-reg [24:0] last_addr;
-always @(posedge clk_sys) if(ioctl_wr) last_addr <= ioctl_addr;
+reg [5:0] cart_pages;
+always @(posedge clk_sys) if(ioctl_wr) cart_pages <= ioctl_addr[19:14];
 
 assign SDRAM_CLK = ~clk_sys;
 sdram sdram
@@ -270,11 +270,15 @@ sdram sdram
    .ready()
 );
 
+reg sg1000 = 0;
 reg extram = 0;
 always @(posedge clk_sys) begin
 	if(ioctl_wr) begin
-		if(!ioctl_addr) extram <= 0;
-		if(ioctl_addr[24:13] == 1) extram <= ((!ioctl_addr[12:0]) ? sg1000 : extram) & &ioctl_dout; // 2000-3FFF on SG-1000
+		if(!ioctl_addr) begin
+			extram <= 0;
+			sg1000 <= (ioctl_index[4:0] == 2);
+		end
+		if(ioctl_addr[24:13] == 1 && sg1000) extram <= (!ioctl_addr[12:0] | extram) & &ioctl_dout; // 2000-3FFF on SG-1000
 	end
 end
 
@@ -303,8 +307,6 @@ wire [7:0] R,G,B;
 wire hblank, vblank;
 wire hsync, vsync;
 
-wire sg1000 = |ioctl_index[4:0];
-
 wire [15:0] joya = status[3] ? joy1 : joy0;
 wire [15:0] joyb = status[3] ? joy0 : joy1;
 
@@ -314,8 +316,8 @@ cv_console console
 	.clk_en_10m7_i(ce_10m7),
 	.reset_n_i(~reset),
 	.por_n_o(),
-   .sg1000(sg1000),
-   .dahjeeA_i(extram),
+	.sg1000(sg1000),
+	.dahjeeA_i(extram),
 
 	.ctrl_p1_i(ctrl_p1),
 	.ctrl_p2_i(ctrl_p2),
@@ -326,8 +328,8 @@ cv_console console
 	.ctrl_p7_i(ctrl_p7),
 	.ctrl_p8_o(ctrl_p8),
 	.ctrl_p9_i(ctrl_p9),
-   .joy0_i(~{|joya[13:6], 1'b0, joya[5:0]}),
-   .joy1_i(~{|joyb[13:6], 1'b0, joyb[5:0]}),
+	.joy0_i(~{|joya[13:6], 1'b0, joya[5:0]}),
+	.joy1_i(~{|joyb[13:6], 1'b0, joyb[5:0]}),
 
 	.bios_rom_a_o(bios_a),
 	.bios_rom_d_i(bios_d),
@@ -343,8 +345,8 @@ cv_console console
 	.vram_d_o(vram_do),
 	.vram_d_i(vram_di),
 
+	.cart_pages_i(cart_pages),
 	.cart_a_o(cart_a),
-   .cart_pages_i(last_addr[19:14]),
 	.cart_d_i(cart_d),
 	.cart_rd(cart_rd),
 
