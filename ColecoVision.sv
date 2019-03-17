@@ -142,7 +142,7 @@ parameter CONF_STR = {
 	"-;",
 	"O45,RAM Size,1KB,8KB,SGM;",
 	"R0,Reset;",
-	"J,Fire 1,Fire 2,*,#,0,1,2,3,Purple Tr,Blue Tr;",
+	"J1,Fire 1,Fire 2,*,#,0,1,2,3,4,5,6,7,8,9,Purple Tr,Blue Tr;",
 	"V,v",`BUILD_DATE
 };
 
@@ -174,8 +174,7 @@ end
 wire [31:0] status;
 wire  [1:0] buttons;
 
-wire [15:0] joy0, joy1;
-wire [10:0] ps2_key;
+wire [31:0] joy0, joy1;
 
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
@@ -200,8 +199,6 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
-
-	.ps2_key(ps2_key),
 
 	.joystick_0(joy0),
 	.joystick_1(joy1)
@@ -317,8 +314,8 @@ wire [7:0] R,G,B;
 wire hblank, vblank;
 wire hsync, vsync;
 
-wire [15:0] joya = status[3] ? joy1 : joy0;
-wire [15:0] joyb = status[3] ? joy0 : joy1;
+wire [31:0] joya = status[3] ? joy1 : joy0;
+wire [31:0] joyb = status[3] ? joy0 : joy1;
 
 cv_console console
 (
@@ -338,8 +335,8 @@ cv_console console
 	.ctrl_p7_i(ctrl_p7),
 	.ctrl_p8_o(ctrl_p8),
 	.ctrl_p9_i(ctrl_p9),
-	.joy0_i(~{|joya[13:6], 1'b0, joya[5:0]}),
-	.joy1_i(~{|joyb[13:6], 1'b0, joyb[5:0]}),
+	.joy0_i(~{|joya[19:6], 1'b0, joya[5:0]}),
+	.joy1_i(~{|joyb[19:6], 1'b0, joyb[5:0]}),
 
 	.bios_rom_a_o(bios_a),
 	.bios_rom_d_i(bios_d),
@@ -405,87 +402,8 @@ video_mixer #(.LINE_LENGTH(290)) video_mixer
 
 ////////////////  Control  ////////////////////////
 
-wire       pressed = ps2_key[9];
-wire [8:0] code    = ps2_key[8:0];
-always @(posedge clk_sys) begin
-	reg old_state;
-	old_state <= ps2_key[10];
-	
-	if(old_state != ps2_key[10]) begin
-		casex(code)
-			'hX75: btn_up    <= pressed;
-			'hX72: btn_down  <= pressed;
-			'hX6B: btn_left  <= pressed;
-			'hX74: btn_right <= pressed;
-			'hX16: btn_1     <= pressed; // 1
-			'hX1E: btn_2     <= pressed; // 2
-			'hX26: btn_3     <= pressed; // 3
-			'hX15: btn_4     <= pressed; // q
-			'hX1D: btn_5     <= pressed; // w
-			'hX24: btn_6     <= pressed; // e
-			'hX1C: btn_7     <= pressed; // a
-			'hX1B: btn_8     <= pressed; // s
-			'hX23: btn_9     <= pressed; // d
-			'hX1A: btn_s     <= pressed; // z
-			'hX22: btn_0     <= pressed; // x
-			'hX21: btn_p     <= pressed; // c
-			'hX1F: btn_pt    <= pressed; // gui l
-			'hX27: btn_pt    <= pressed; // gui r
-			'hX11: btn_bt    <= pressed; // alt
-
-			'hX25: btn_4     <= pressed; // 4
-			'hX2E: btn_5     <= pressed; // 5
-			'hX36: btn_6     <= pressed; // 6
-			'hX3D: btn_7     <= pressed; // 7
-			'hX3E: btn_8     <= pressed; // 8
-			'hX46: btn_9     <= pressed; // 9
-			'hX45: btn_0     <= pressed; // 0
-
-			'h012: btn_arm   <= pressed; // shift l
-			'h059: btn_arm   <= pressed; // shift r
-			'hX14: btn_fire  <= pressed; // ctrl
-		endcase
-	end
-end
-
-reg btn_up    = 0;
-reg btn_down  = 0;
-reg btn_left  = 0;
-reg btn_right = 0;
-reg btn_1     = 0;
-reg btn_2     = 0;
-reg btn_3     = 0;
-reg btn_4     = 0;
-reg btn_5     = 0;
-reg btn_6     = 0;
-reg btn_7     = 0;
-reg btn_8     = 0;
-reg btn_9     = 0;
-reg btn_s     = 0;
-reg btn_0     = 0;
-reg btn_p     = 0;
-reg btn_pt    = 0;
-reg btn_bt    = 0;
-reg btn_arm   = 0;
-reg btn_fire  = 0;
-
-wire m_right  = btn_right | joya[0];
-wire m_left   = btn_left  | joya[1];
-wire m_down   = btn_down  | joya[2];
-wire m_up     = btn_up    | joya[3];
-wire m_fire   = btn_fire  | joya[4];
-wire m_arm    = btn_arm   | joya[5];
-wire m_1      = btn_1     | joya[9];
-wire m_2      = btn_2     | joya[10];
-wire m_3      = btn_3     | joya[11];
-wire m_s      = btn_s     | joya[6];
-wire m_0      = btn_0     | joya[8];
-wire m_p      = btn_p     | joya[7];
-wire m_pt     = btn_pt    | joya[12];
-wire m_bt     = btn_bt    | joya[13];
-
-wire [0:19] keypad0 = {m_0,m_1,m_2,m_3,btn_4,btn_5,btn_6,btn_7,btn_8,btn_9,m_s,m_p,m_pt,m_bt,m_up,m_down,m_left,m_right,m_fire,m_arm};
-wire [0:19] keypad1 = {joyb[8],joyb[9],joyb[10],joyb[11],1'b0,1'b0,1'b0,1'b0,1'b0,1'b0,joyb[6],joyb[7],joyb[12],joyb[13],joyb[3],joyb[2],joyb[1],joyb[0],joyb[4],joyb[5]};
+wire [0:19] keypad0 = {joya[8],joya[9],joya[10],joya[11],joya[12],joya[13],joya[14],joya[15],joya[16],joya[17],joya[6],joya[7],joya[18],joya[19],joya[3],joya[2],joya[1],joya[0],joya[4],joya[5]};
+wire [0:19] keypad1 = {joyb[8],joyb[9],joyb[10],joyb[11],joyb[12],joyb[13],joyb[14],joyb[15],joyb[16],joyb[17],joyb[6],joyb[7],joyb[18],joyb[19],joyb[3],joyb[2],joyb[1],joyb[0],joyb[4],joyb[5]};
 wire [0:19] keypad[2] = '{keypad0,keypad1};
 
 reg [3:0] ctrl1[2] = '{'0,'0};
