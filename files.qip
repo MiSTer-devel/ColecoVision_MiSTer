@@ -1,4 +1,4 @@
-set_global_assignment -name QIP_FILE T80/t80.qip
+set_global_assignment -name QIP_FILE T80/T80.qip
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name VHDL_FILE bram.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE YM2149.sv
