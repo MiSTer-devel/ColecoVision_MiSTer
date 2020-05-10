@@ -191,7 +191,8 @@ wire        ioctl_wr;
 wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire        forced_scandoubler;
-
+wire [21:0] gamma_bus;
+ 
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -202,6 +203,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.forced_scandoubler(forced_scandoubler),
+	.gamma_bus(gamma_bus),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
@@ -222,11 +224,11 @@ wire reset = RESET | status[0] | buttons[1] | ioctl_download;
 wire [12:0] bios_a;
 wire  [7:0] bios_d;
 
-spram #(13,8,"bios.mif") rom
+spram #(13,8,"rtl/bios.mif") rom
 (
 	.clock(clk_sys),
-   .address(bios_a),
-   .q(bios_d)
+	.address(bios_a),
+	.q(bios_d)
 );
 
 wire [14:0] cpu_ram_a;
@@ -389,10 +391,11 @@ always @(posedge CLK_VIDEO) begin
 	if(~hs_o & ~hsync) vs_o <= ~vsync;
 end
 
-video_mixer #(.LINE_LENGTH(290)) video_mixer
+video_mixer #(.LINE_LENGTH(290), .GAMMA(1)) video_mixer
 (
 	.*,
 
+	.clk_vid(CLK_VIDEO),
 	.ce_pix(ce_5m3),
 	.ce_pix_out(CE_PIXEL),
 
