@@ -184,6 +184,7 @@ wire [31:0] status;
 wire  [1:0] buttons;
 
 wire [31:0] joy0, joy1;
+wire [10:0] ps2_key;
 
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
@@ -210,6 +211,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
+
+	.ps2_key(ps2_key),
 
 	.joystick_0(joy0),
 	.joystick_1(joy1)
@@ -417,12 +420,71 @@ video_mixer #(.LINE_LENGTH(290), .GAMMA(1)) video_mixer
 );
 
 
+wire       pressed = ps2_key[9];
+wire [8:0] code    = ps2_key[8:0];
+always @(posedge clk_sys) begin
+	reg old_state;
+	old_state <= ps2_key[10];
+	
+	if(old_state != ps2_key[10]) begin
+		casex(code)
+			
+			'hX16: btn_1     <= pressed; // 1
+			'hX1E: btn_2     <= pressed; // 2
+			'hX26: btn_3     <= pressed; // 3
+			'hX25: btn_4     <= pressed; // 4
+			'hX2E: btn_5     <= pressed; // 5
+			'hX36: btn_6     <= pressed; // 6
+			'hX3D: btn_7     <= pressed; // 7
+			'hX3E: btn_8     <= pressed; // 8
+			'hX46: btn_9     <= pressed; // 9
+			'hX45: btn_0     <= pressed; // 0
+			
+			'hX69: btn_1     <= pressed; // 1
+			'hX72: btn_2     <= pressed; // 2
+			'hX7A: btn_3     <= pressed; // 3
+			'hX6B: btn_4     <= pressed; // 4
+			'hX73: btn_5     <= pressed; // 5
+			'hX74: btn_6     <= pressed; // 6
+			'hX6C: btn_7     <= pressed; // 7
+			'hX75: btn_8     <= pressed; // 8
+			'hX7D: btn_9     <= pressed; // 9
+			'hX70: btn_0     <= pressed; // 0
+
+			
+			'hX7C: btn_star  <= pressed; // *
+			'hX59: btn_shift <= pressed; // Right Shift
+			'hX12: btn_shift <= pressed; // Left Shift
+			'hX7B: btn_minus <= pressed; // - on keypad
+			
+			
+		endcase
+	end
+end
+
+reg btn_1 = 0;
+reg btn_2 = 0;
+reg btn_3 = 0;
+reg btn_4 = 0;
+reg btn_5 = 0;
+reg btn_6 = 0;
+reg btn_7 = 0;
+reg btn_8 = 0;
+reg btn_9 = 0;
+reg btn_0 = 0;
+
+reg btn_star = 0;
+reg btn_shift = 0;
+reg btn_minus = 0;
+
 
 ////////////////  Control  ////////////////////////
-
+//	"J1,dir,dir,dir,dir,Fire 1,Fire 2,*,#,[8]0,1,2,3,4,5,6,7,8,9,Purple Tr,Blue Tr;",
+//        0   1   2   3   4      5     6 7 8 9 10 11 12 
 wire [0:19] keypad0 = {joya[8],joya[9],joya[10],joya[11],joya[12],joya[13],joya[14],joya[15],joya[16],joya[17],joya[6],joya[7],joya[18],joya[19],joya[3],joya[2],joya[1],joya[0],joya[4],joya[5]};
 wire [0:19] keypad1 = {joyb[8],joyb[9],joyb[10],joyb[11],joyb[12],joyb[13],joyb[14],joyb[15],joyb[16],joyb[17],joyb[6],joyb[7],joyb[18],joyb[19],joyb[3],joyb[2],joyb[1],joyb[0],joyb[4],joyb[5]};
-wire [0:19] keypad[2] = '{keypad0,keypad1};
+wire [0:19] keyboardemu = { btn_0, btn_1, btn_2, btn_3, btn_4, btn_5, btn_6, btn_7, btn_8, btn_9, btn_star | (btn_8&btn_shift), btn_minus | (btn_shift & btn_3), 8'b0};
+wire [0:19] keypad[2] = '{keypad0|keyboardemu,keypad1|keyboardemu};
 
 reg [3:0] ctrl1[2] = '{'0,'0};
 assign {ctrl_p1[0],ctrl_p2[0],ctrl_p3[0],ctrl_p4[0]} = ctrl1[0];
