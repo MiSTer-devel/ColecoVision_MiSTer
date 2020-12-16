@@ -334,9 +334,15 @@ wire [31:0] joy0_mix = {joy0[31:18],joy0[17]|btn_9,joy0[16]|m_eight,joy0[15]|btn
                                     joy0[8]|btn_0,joy0[7]|m_hash,joy0[6]|m_star,
 												joy0[5:0]
 												};
+wire [31:0] joy1_mix = {joy1[31:18],joy1[17]|btn_kypd_9,joy1[16]|btn_kypd_8,joy1[15]|btn_kypd_7,
+                                    joy1[14]|btn_kypd_6,joy1[13]|btn_kypd_5,joy1[12]|btn_kypd_4,
+                                    joy1[11]|btn_kypd_3,joy1[10]|btn_kypd_2,joy1[9]|btn_kypd_1,
+                                    joy1[8]|btn_kypd_0,joy1[7]|btn_kypd_minus,joy1[6]|btn_kypd_star,
+												joy1[5:0]
+												};
 
-wire [31:0] joya = status[3] ? joy1 : joy0_mix;
-wire [31:0] joyb = status[3] ? joy0_mix : joy1;
+wire [31:0] joya = status[3] ? joy1_mix : joy0_mix;
+wire [31:0] joyb = status[3] ? joy0_mix : joy1_mix;
 
 cv_console console
 (
@@ -442,9 +448,26 @@ reg btn_8 = 0;
 reg btn_9 = 0;
 reg btn_0 = 0;
 
-reg btn_star = 0;
-reg btn_shift = 0;
+reg btn_kypd_1 = 0;
+reg btn_kypd_2 = 0;
+reg btn_kypd_3 = 0;
+reg btn_kypd_4 = 0;
+reg btn_kypd_5 = 0;
+reg btn_kypd_6 = 0;
+reg btn_kypd_7 = 0;
+reg btn_kypd_8 = 0;
+reg btn_kypd_9 = 0;
+reg btn_kypd_0 = 0;
+
+
+reg btn_kypd_star = 0;
+reg btn_kypd_minus = 0;
+
 reg btn_minus = 0;
+reg btn_equal = 0;
+
+reg btn_shift = 0;
+
 
 wire       pressed = ps2_key[9];
 wire [8:0] code    = ps2_key[8:0];
@@ -466,22 +489,27 @@ always @(posedge clk_sys) begin
 			'h046: btn_9     <= pressed; // 9
 			'h045: btn_0     <= pressed; // 0
 			
-			'h069: btn_1     <= pressed; // 1
-			'h072: btn_2     <= pressed; // 2
-			'h07A: btn_3     <= pressed; // 3
-			'h06B: btn_4     <= pressed; // 4
-			'h073: btn_5     <= pressed; // 5
-			'h074: btn_6     <= pressed; // 6
-			'h06C: btn_7     <= pressed; // 7
-			'h075: btn_8     <= pressed; // 8
-			'h07D: btn_9     <= pressed; // 9
-			'h070: btn_0     <= pressed; // 0
+			// numeric keypad on a 104 style keyboard
+			'h069: btn_kypd_1     <= pressed; // 1
+			'h072: btn_kypd_2     <= pressed; // 2
+			'h07A: btn_kypd_3     <= pressed; // 3
+			'h06B: btn_kypd_4     <= pressed; // 4
+			'h073: btn_kypd_5     <= pressed; // 5
+			'h074: btn_kypd_6     <= pressed; // 6
+			'h06C: btn_kypd_7     <= pressed; // 7
+			'h075: btn_kypd_8     <= pressed; // 8
+			'h07D: btn_kypd_9     <= pressed; // 9
+			'h070: btn_kypd_0     <= pressed; // 0
 
 			
-			'h07C: btn_star  <= pressed; // *
+			'h07C: btn_kypd_star  <= pressed; // *
 			'h059: btn_shift <= pressed; // Right Shift
 			'h012: btn_shift <= pressed; // Left Shift
-			'h07B: btn_minus <= pressed; // - on keypad
+			'h07B: btn_kypd_minus <= pressed; // - on keypad
+			
+			'h04E: btn_minus <= pressed; // - on main keyboard
+			'h055: btn_equal <= pressed; // = on main keyboard
+			
 			
 			
 		endcase
@@ -491,8 +519,8 @@ end
 //	"J1,dir,dir,dir,dir,Fire 1,Fire 2,*,#,[8]0,1,2,3,4,5,6,7,8,9,Purple Tr,Blue Tr;",
 //        0   1   2   3   4      5     6 7 8 9 10 11 12 
 
-wire m_star = btn_star | (btn_8&btn_shift);
-wire m_hash = btn_minus | (btn_3&btn_shift);
+wire m_star = btn_minus | (btn_8&btn_shift);
+wire m_hash = btn_equal | (btn_3&btn_shift);
 wire m_eight =  (btn_8&~btn_shift);
 wire m_three =  (btn_3&~btn_shift);
 
