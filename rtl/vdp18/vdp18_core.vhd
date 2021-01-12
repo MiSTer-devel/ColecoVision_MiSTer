@@ -98,6 +98,7 @@ entity vdp18_core is
     vram_d_o      : out std_logic_vector(0 to  7);
     vram_d_i      : in  std_logic_vector(0 to  7);
     -- Video Interface --------------------------------------------------------
+    border_i      : in  std_logic;
     col_o         : out std_logic_vector(0 to 3);
     rgb_r_o       : out std_logic_vector(0 to 7);
     rgb_g_o       : out std_logic_vector(0 to 7);
@@ -379,6 +380,7 @@ begin
       reset_i       => reset_s,
       vert_active_i => vert_active_s,
       hor_active_i  => hor_active_s,
+      border_i      => border_i,
       blank_i       => blank_s,
       hblank_i      => hblank_s,
       vblank_i      => vblank_s,
@@ -389,9 +391,9 @@ begin
       spr2_col_i    => spr2_col_s,
       spr3_col_i    => spr3_col_s,
       col_o         => col_o,
-		blank_n_o     => blank_n,
-		hblank_n_o    => hblank_n,
-		vblank_n_o    => vblank_n,
+      blank_n_o     => blank_n,
+      hblank_n_o    => hblank_n,
+      vblank_n_o    => vblank_n,
       rgb_r_o       => rgb_r_o,
       rgb_g_o       => rgb_g_o,
       rgb_b_o       => rgb_b_o

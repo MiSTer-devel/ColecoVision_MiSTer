@@ -195,6 +195,7 @@ parameter CONF_STR = {
 	"-;",
 	"O12,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"O6,Border,No,Yes;",
 	"-;",
 	"O3,Joysticks swap,No,Yes;",
 	"-;",
@@ -417,6 +418,7 @@ cv_console console
 	.cart_d_i(cart_d),
 	.cart_rd(cart_rd),
 
+	.border_i(status[6]),
 	.rgb_r_o(R),
 	.rgb_g_o(G),
 	.rgb_b_o(B),

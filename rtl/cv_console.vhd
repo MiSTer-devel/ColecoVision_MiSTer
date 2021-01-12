@@ -113,6 +113,7 @@ entity cv_console is
     cart_d_i        : in  std_logic_vector( 7 downto 0);
     cart_en_sg1000_n_o : out std_logic;
     -- RGB Video Interface ----------------------------------------------------
+    border_i        : in  std_logic;
     col_o           : out std_logic_vector( 3 downto 0);
     rgb_r_o         : out std_logic_vector( 7 downto 0);
     rgb_g_o         : out std_logic_vector( 7 downto 0);
@@ -366,6 +367,7 @@ begin
       hsync_n_o     => hsync_n_o,
       vsync_n_o     => vsync_n_o,
       blank_n_o     => blank_n_o,
+      border_i      => border_i,
       hblank_o      => hblank_o,
       vblank_o      => vblank_o,
       comp_sync_n_o => comp_sync_n_o

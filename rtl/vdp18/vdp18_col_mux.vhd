@@ -58,6 +58,7 @@ entity vdp18_col_mux is
     reset_i       : in  boolean;
     vert_active_i : in  boolean;
     hor_active_i  : in  boolean;
+    border_i      : in  std_logic;
     blank_i       : in  boolean;
     hblank_i      : in  boolean;
     vblank_i      : in  boolean;
@@ -173,9 +174,14 @@ begin
         rgb_r_o <= std_logic_vector(to_unsigned(rgb_r_v, 8));
         rgb_g_o <= std_logic_vector(to_unsigned(rgb_g_v, 8));
         rgb_b_o <= std_logic_vector(to_unsigned(rgb_b_v, 8));
-		  blank_n_o <= not blank_i;
-		  hblank_n_o <= not hblank_i;
-		  vblank_n_o <= not vblank_i;
+        blank_n_o <= not blank_i;
+        if border_i = '0' then
+          hblank_n_o <= hor_active_i;
+          vblank_n_o <= vert_active_i;
+        else
+          hblank_n_o <= not hblank_i;
+          vblank_n_o <= not vblank_i;
+        end if;
       end if;
 
     end if;
