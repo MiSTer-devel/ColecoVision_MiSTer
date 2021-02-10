@@ -190,9 +190,9 @@ begin
             vsync_n_o <= '1';
           end if;
 
-          if    cnt_vert_q = 215 then
+          if    cnt_vert_q = 214 then
             vblank_q  <= true;
-          elsif cnt_vert_q = first_line_s + 13 then
+          elsif cnt_vert_q = first_line_s + 14 then
             vblank_q  <= false;
           end if;
         end if;
