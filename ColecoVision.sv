@@ -52,6 +52,9 @@ module emu
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
 
+	input  [11:0] HDMI_WIDTH,
+	input  [11:0] HDMI_HEIGHT,
+
 `ifdef USE_FB
 	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
 	// FB_FORMAT:
@@ -182,9 +185,19 @@ assign BUTTONS    = 0;
 assign VGA_SCALER = 0;
 
 wire [1:0] ar = status[2:1];
+wire vga_de;
+reg  en216p;
+always @(posedge CLK_VIDEO) en216p <= ((HDMI_WIDTH == 1920) && (HDMI_HEIGHT == 1080) && !forced_scandoubler && !scale);
 
-assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+video_crop video_crop
+(
+	.*,
+	.VGA_DE_IN(vga_de),
+	.ARX((!ar) ? 12'd4 : (ar - 1'd1)),
+	.ARY((!ar) ? 12'd3 : 12'd0),
+	.CROP_SIZE(en216p ? 10'd216 : 10'd0),
+	.CROP_OFF(0)
+);
 
 `include "build_id.v" 
 parameter CONF_STR = {
@@ -456,6 +469,7 @@ video_mixer #(.LINE_LENGTH(290), .GAMMA(1)) video_mixer
 
 	.mono(0),
 
+	.VGA_DE(vga_de),
 	.R(R),
 	.G(G),
 	.B(B),
