@@ -369,9 +369,9 @@ end
 
 ////////////////  Console  ////////////////////////
 
-wire [10:0] audio;
-assign AUDIO_L = {audio,5'd0};
-assign AUDIO_R = {audio,5'd0};
+wire [13:0] audio;
+assign AUDIO_L = {audio,2'd0};
+assign AUDIO_R = {audio,2'd0};
 assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 

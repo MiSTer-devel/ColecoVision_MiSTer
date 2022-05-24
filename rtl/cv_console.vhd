@@ -57,8 +57,7 @@
 
 library ieee;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.STD_LOGIC_ARITH.ALL;
-use IEEE.STD_LOGIC_UNSIGNED.ALL; 
+use ieee.numeric_std.all;
 
 entity cv_console is
 
@@ -125,7 +124,7 @@ entity cv_console is
     vblank_o        : out std_logic;
     comp_sync_n_o   : out std_logic;
     -- Audio Interface --------------------------------------------------------
-    audio_o         : out std_logic_vector(10 downto 0)
+    audio_o         : out unsigned(13 downto 0)
   );
 
 end cv_console;
@@ -146,9 +145,9 @@ architecture struct of cv_console is
     BC          : in  std_logic; -- Bus control
     DI          : in  std_logic_vector(7 downto 0);
     DO          : out std_logic_vector(7 downto 0);
-    CHANNEL_A   : out std_logic_vector(7 downto 0);
-    CHANNEL_B   : out std_logic_vector(7 downto 0);
-    CHANNEL_C   : out std_logic_vector(7 downto 0);
+    CHANNEL_A   : out unsigned(7 downto 0);
+    CHANNEL_B   : out unsigned(7 downto 0);
+    CHANNEL_C   : out unsigned(7 downto 0);
 
     SEL         : in  std_logic;
     MODE        : in  std_logic;
@@ -190,19 +189,20 @@ architecture struct of cv_console is
 
   -- SN76489 signal
   signal psg_ready_s      : std_logic;
-  signal psg_audio_s      : std_logic_vector( 7 downto 0);
+  signal psg_audio_s      : unsigned( 13 downto 0);
 
   -- AY-8910 signal
   signal ay_d_s           : std_logic_vector( 7 downto 0);
-  signal ay_ch_a_s        : std_logic_vector( 7 downto 0);
-  signal ay_ch_b_s        : std_logic_vector( 7 downto 0);
-  signal ay_ch_c_s        : std_logic_vector( 7 downto 0);
+  signal ay_ch_a_s        : unsigned( 7 downto 0);
+  signal ay_ch_b_s        : unsigned( 7 downto 0);
+  signal ay_ch_c_s        : unsigned( 7 downto 0);
 
   signal audio_mix        : std_logic_vector( 9 downto 0);
 
   -- Controller signals
   signal d_from_ctrl_s    : std_logic_vector( 7 downto 0);
   signal d_to_ctrl_s      : std_logic_vector( 7 downto 0);
+  signal ctrl_int_n_s     : std_logic;
 
   -- Address decoder signals
   signal bios_rom_ce_n_s  : std_logic;
@@ -233,10 +233,10 @@ architecture struct of cv_console is
 begin
 
   vdd_s <= '1';
-  audio_o <= ('0'&psg_audio_s&"00") + ay_ch_a_s + ay_ch_b_s + ay_ch_c_s;
+  audio_o <= (psg_audio_s) + ay_ch_a_s + ay_ch_b_s + ay_ch_c_s;
 
-  int_n_s <= '1' when sg1000 = '0' else vdp_int_n_s;
-  nmi_n_s <= vdp_int_n_s when sg1000 = '0' else joy0_i(7) and joy1_i(7);
+  int_n_s <= ctrl_int_n_s when sg1000 = '0' else vdp_int_n_s;
+  nmi_n_s <= vdp_int_n_s  when sg1000 = '0' else joy0_i(7) and joy1_i(7);
 
   -----------------------------------------------------------------------------
   -- Reset generation
@@ -377,19 +377,19 @@ begin
   -----------------------------------------------------------------------------
   -- SN76489 Programmable Sound Generator
   -----------------------------------------------------------------------------
-  psg_b : work.sn76489_top
+  psg_b : work.sn76489_audio
     generic map (
-      clock_div_16_g => 1
+      FAST_IO_G          => '0',
+		MIN_PERIOD_CNT_G   => 17
     )
     port map (
-      clock_i    => clk_i,
-      clock_en_i => clk_en_3m58_p_s,
-      res_n_i    => reset_n_s,
-      ce_n_i     => psg_we_n_s,
-      we_n_i     => psg_we_n_s,
-      ready_o    => psg_ready_s,
-      d_i        => d_from_cpu_s,
-      aout_o     => psg_audio_s
+      clk_i        => clk_i,
+      en_clk_psg_i => clk_en_3m58_p_s,
+      ce_n_i       => psg_we_n_s,
+      wr_n_i       => psg_we_n_s,
+      ready_o      => psg_ready_s,
+      data_i       => d_from_cpu_s,
+      mix_audio_o  => psg_audio_s
     );
 
 
@@ -413,7 +413,8 @@ begin
       ctrl_p7_i       => ctrl_p7_i,
       ctrl_p8_o       => ctrl_p8_o,
       ctrl_p9_i       => ctrl_p9_i,
-      d_o             => d_from_ctrl_s
+      d_o             => d_from_ctrl_s,
+		int_n_o         => ctrl_int_n_s
     );
 
 
