@@ -136,7 +136,6 @@ use std.textio.all;
 
 architecture struct of cv_console is
 
-
   signal por_n_s          : std_logic;
   signal reset_n_s        : std_logic;
 
