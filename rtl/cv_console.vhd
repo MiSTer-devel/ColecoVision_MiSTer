@@ -328,7 +328,7 @@ begin
     port map (
 		clk_i       => clk_i,
 		en_clk_psg_i=> clk_en_3m58_p_s,
-		reset_n_i   => not reset_n_s,
+		reset_n_i   => reset_n_s,
 		bdir_i      => not ay_addr_we_n_s or not ay_data_we_n_s,
 		bc_i        => not ay_addr_we_n_s or not ay_data_rd_n_s,
 		data_i      => d_from_cpu_s,
