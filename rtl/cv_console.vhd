@@ -136,32 +136,6 @@ use std.textio.all;
 
 architecture struct of cv_console is
 
-  component YM2149
-  port (
-    CLK         : in  std_logic;
-    CE          : in  std_logic;
-    RESET       : in  std_logic;
-    BDIR        : in  std_logic; -- Bus Direction (0 - read , 1 - write)
-    BC          : in  std_logic; -- Bus control
-    DI          : in  std_logic_vector(7 downto 0);
-    DO          : out std_logic_vector(7 downto 0);
-    CHANNEL_A   : out unsigned(7 downto 0);
-    CHANNEL_B   : out unsigned(7 downto 0);
-    CHANNEL_C   : out unsigned(7 downto 0);
-
-    SEL         : in  std_logic;
-    MODE        : in  std_logic;
-
-    ACTIVE      : out std_logic_vector(5 downto 0);
-
-    IOA_in      : in  std_logic_vector(7 downto 0);
-    IOA_out     : out std_logic_vector(7 downto 0);
-
-    IOB_in      : in  std_logic_vector(7 downto 0);
-    IOB_out     : out std_logic_vector(7 downto 0)
-    );
-  end component;
-
   signal por_n_s          : std_logic;
   signal reset_n_s        : std_logic;
 
@@ -189,15 +163,14 @@ architecture struct of cv_console is
 
   -- SN76489 signal
   signal psg_ready_s      : std_logic;
-  signal psg_audio_s      : unsigned( 13 downto 0);
+  signal psg_b_audio_s    : unsigned( 13 downto 0);
 
   -- AY-8910 signal
   signal ay_d_s           : std_logic_vector( 7 downto 0);
-  signal ay_ch_a_s        : unsigned( 7 downto 0);
-  signal ay_ch_b_s        : unsigned( 7 downto 0);
-  signal ay_ch_c_s        : unsigned( 7 downto 0);
-
-  signal audio_mix        : std_logic_vector( 9 downto 0);
+  signal ay_ch_a_s        : unsigned( 11 downto 0);
+  signal ay_ch_b_s        : unsigned( 11 downto 0);
+  signal ay_ch_c_s        : unsigned( 11 downto 0);
+  signal psg_a_audio_s    : unsigned( 13 downto 0);
 
   -- Controller signals
   signal d_from_ctrl_s    : std_logic_vector( 7 downto 0);
@@ -233,7 +206,7 @@ architecture struct of cv_console is
 begin
 
   vdd_s <= '1';
-  audio_o <= (psg_audio_s) + ay_ch_a_s + ay_ch_b_s + ay_ch_c_s;
+  audio_o <= psg_a_audio_s + psg_b_audio_s;
 
   int_n_s <= ctrl_int_n_s when sg1000 = '0' else vdp_int_n_s;
   nmi_n_s <= vdp_int_n_s  when sg1000 = '0' else joy0_i(7) and joy1_i(7);
@@ -290,30 +263,7 @@ begin
       DO         => d_from_cpu_s
     );
 
-  ym2149_inst: YM2149
-  port map (
-    CLK         => clk_i,
-    CE          => clk_en_3m58_p_s,
-    RESET       => not reset_n_s,
-    BDIR        => not ay_addr_we_n_s or not ay_data_we_n_s,
-    BC          => not ay_addr_we_n_s or not ay_data_rd_n_s,
-    DI          => d_from_cpu_s,
-    DO          => ay_d_s,
-    CHANNEL_A   => ay_ch_a_s,
-    CHANNEL_B   => ay_ch_b_s,
-    CHANNEL_C   => ay_ch_c_s,
 
-    SEL         => '0',
-    MODE        => '0',
-
-    ACTIVE      => open,
-
-    IOA_in      => (others => '0'),
-    IOA_out     => open,
-
-    IOB_in      => (others => '0'),
-    IOB_out     => open
-    );
 
   -----------------------------------------------------------------------------
   -- Process m1_wait
@@ -374,6 +324,23 @@ begin
     );
 
 
+  psg_a: work.ym2149_audio
+    port map (
+		clk_i       => clk_i,
+		en_clk_psg_i=> clk_en_3m58_p_s,
+		reset_n_i   => reset_n_s,
+		bdir_i      => not ay_addr_we_n_s or not ay_data_we_n_s,
+		bc_i        => not ay_addr_we_n_s or not ay_data_rd_n_s,
+		data_i      => d_from_cpu_s,
+		data_r_o    => ay_d_s,
+		ch_a_o      => ay_ch_a_s,
+		ch_b_o      => ay_ch_b_s,
+		ch_c_o      => ay_ch_c_s,
+		mix_audio_o => psg_a_audio_s,
+		sel_n_i     => '0'
+    );
+ 
+	 
   -----------------------------------------------------------------------------
   -- SN76489 Programmable Sound Generator
   -----------------------------------------------------------------------------
@@ -389,7 +356,7 @@ begin
       wr_n_i       => psg_we_n_s,
       ready_o      => psg_ready_s,
       data_i       => d_from_cpu_s,
-      mix_audio_o  => psg_audio_s
+      mix_audio_o  => psg_b_audio_s
     );
 
 

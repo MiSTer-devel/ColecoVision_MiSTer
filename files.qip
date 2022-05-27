@@ -2,7 +2,7 @@ set_global_assignment -name QIP_FILE rtl/T80/T80.qip
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sdram.sv
 set_global_assignment -name VHDL_FILE rtl/bram.vhd
 set_global_assignment -name VHDL_FILE rtl/sn76489_audio.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/YM2149.sv
+set_global_assignment -name VHDL_FILE rtl/ym2149_audio.vhd
 set_global_assignment -name VHDL_FILE "rtl/vdp18/vdp18_pack-p.vhd"
 set_global_assignment -name VHDL_FILE rtl/vdp18/vdp18_pattern.vhd
 set_global_assignment -name VHDL_FILE rtl/vdp18/vdp18_sprite.vhd
