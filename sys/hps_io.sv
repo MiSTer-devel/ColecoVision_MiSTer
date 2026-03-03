@@ -26,8 +26,13 @@
 // WIDE=1 for 16 bit file I/O
 // VDNUM 1..10
 // BLKSZ 0..7: 0 = 128, 1 = 256, 2 = 512(default), .. 7 = 16384
+
+// F12KEYMOD - is modifier key requested to raise fremework menu? 
+//  0 - no, F12 bring framework menu
+//  1 - F12 is passed to core, F12 + (L/R)GUI key bring framework menu
+
 //
-module hps_io #(parameter CONF_STR, CONF_STR_BRAM=1, PS2DIV=0, WIDE=0, VDNUM=1, BLKSZ=2, PS2WE=0)
+module hps_io #(parameter CONF_STR, CONF_STR_BRAM=0, PS2DIV=0, WIDE=0, VDNUM=1, BLKSZ=2, PS2WE=0, STRLEN=$size(CONF_STR)>>3, F12KEYMOD=0)
 (
 	input             clk_sys,
 	inout      [48:0] HPS_BUS,
@@ -39,7 +44,7 @@ module hps_io #(parameter CONF_STR, CONF_STR_BRAM=1, PS2DIV=0, WIDE=0, VDNUM=1, 
 	output reg [31:0] joystick_3,
 	output reg [31:0] joystick_4,
 	output reg [31:0] joystick_5,
-	
+
 	// analog -127..+127, Y: [15:8], X: [7:0]
 	output reg [15:0] joystick_l_analog_0,
 	output reg [15:0] joystick_l_analog_1,
@@ -232,7 +237,6 @@ video_calc video_calc
 
 /////////////////////////////////////////////////////////
 
-localparam STRLEN = $size(CONF_STR)>>3;
 localparam MAX_W = $clog2((64 > (STRLEN+2)) ? 64 : (STRLEN+2))-1;
 
 wire [7:0] conf_byte;
@@ -281,7 +285,7 @@ always@(posedge clk_sys) begin : uio_block
 		stflg <= stflg + 1'd1;
 		status_req <= status_in;
 	end
-	
+
 	old_upload_req <= ioctl_upload_req;
 	if(~old_upload_req & ioctl_upload_req) upload_req <= 1;
 
@@ -335,7 +339,9 @@ always@(posedge clk_sys) begin : uio_block
 				  'h32: io_dout <= gamma_bus[21];
 				  'h36: begin io_dout <= info_n; info_n <= 0; end
 				  'h39: io_dout <= 1;
-				  'h3C: if(upload_req) begin io_dout <= {ioctl_upload_index, 8'd1}; upload_req <= 0; end
+				  'h3C: if(upload_req) begin io_dout <= {ioctl_upload_index, 8'd1}; upload_req <= 0; end				  
+				  'h43: io_dout <= F12KEYMOD;
+				  
 				  'h3E: io_dout <= 1; // shadow mask
 				'h003F: io_dout <= joystick_0_rumble;
 				'h013F: io_dout <= joystick_1_rumble;
@@ -523,7 +529,7 @@ always@(posedge clk_sys) begin : uio_block
 
 				//menu mask
 				'h2E: if(byte_cnt == 1) io_dout <= status_menumask;
-				
+
 				//sdram size set
 				'h31: if(byte_cnt == 1) sdram_sz <= io_din;
 
@@ -630,7 +636,7 @@ always@(posedge clk_sys) begin : fio_block
 	reg        has_cmd;
 	reg [26:0] addr;
 	reg        wr;
-	
+
 	ioctl_rd <= 0;
 	ioctl_wr <= wr;
 	wr <= 0;
@@ -663,7 +669,7 @@ always@(posedge clk_sys) begin : fio_block
 					FIO_FILE_TX:
 						begin
 							cnt <= cnt + 1'd1;
-							case(cnt) 
+							case(cnt)
 								0:	if(io_din[7:0] == 8'hAA) begin
 										ioctl_addr <= 0;
 										ioctl_upload <= 1;
@@ -1032,8 +1038,15 @@ module confstr_rom #(parameter CONF_STR, STRLEN)
 	output reg [7:0] conf_byte
 );
 
-wire [7:0] rom[STRLEN];
-initial for(int i = 0; i < STRLEN; i++) rom[i] = CONF_STR[((STRLEN-i)*8)-1 -:8];
+reg [7:0] rom[STRLEN];
+
+initial begin
+	if( CONF_STR=="" )
+		$readmemh("cfgstr.hex",rom);
+	else
+		for(int i = 0; i < STRLEN; i++) rom[i] = CONF_STR[((STRLEN-i)*8)-1 -:8];
+end
+
 always @ (posedge clk_sys) conf_byte <= rom[conf_addr];
 
 endmodule
