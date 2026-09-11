@@ -78,7 +78,13 @@ entity cv_addr_dec is
     cart_en_a0_n_o  : out std_logic;
     cart_en_c0_n_o  : out std_logic;
     cart_en_e0_n_o  : out std_logic;
-    cart_en_sg1000_n_o: out std_logic
+    cart_en_sg1000_n_o: out std_logic;
+
+    ss_frz_i        : in  std_logic := '0';
+    ss_wr_i         : in  std_logic := '0';
+    ss_a_i          : in  std_logic_vector(3 downto 0) := (others => '0');
+    ss_d_i          : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_o          : out std_logic_vector(7 downto 0)
   );
 
 end cv_addr_dec;
@@ -253,12 +259,22 @@ begin
 
   --
   -----------------------------------------------------------------------------
+  ss_d_o <= '0' & bios_en & megacart_page;
+
   megacart: process (reset_n_i, clk_i)
   begin
         if reset_n_i = '0' then
             megacart_page <= "000000";
             bios_en <= '1';
         elsif rising_edge( clk_i ) then
+          if ss_wr_i = '1' then
+            if ss_a_i = x"0" then
+              megacart_page <= ss_d_i(5 downto 0);
+              bios_en       <= ss_d_i(6);
+            end if;
+          elsif ss_frz_i = '1' then
+            null;
+          else
             -- MegaCart paging
             if megacart_en = '1' and rfsh_n_i = '1' and mreq_n_i = '0' and
                rd_n_i = '0' and a_i(15 downto 6) = x"FF"&"11"
@@ -273,6 +289,7 @@ begin
             then
                 bios_en <= d_i(1);
             end if;
+          end if;
         end if;
   end process megacart;
 

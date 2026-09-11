@@ -55,7 +55,12 @@ entity vdp18_clk_gen is
     reset_i       : in  boolean;
     clk_en_5m37_o : out boolean;
     clk_en_3m58_o : out boolean;
-    clk_en_2m68_o : out boolean
+    clk_en_2m68_o : out boolean;
+
+    ss_wr_i       : in  std_logic := '0';
+    ss_a_i        : in  std_logic_vector(3 downto 0) := (others => '0');
+    ss_d_i        : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_o        : out std_logic_vector(7 downto 0)
   );
 
 end vdp18_clk_gen;
@@ -84,7 +89,11 @@ begin
       cnt_q     <= (others => '0');
 
     elsif clk_i'event and clk_i = '1' then
-      if clk_en_10m7_i = '1' then
+      if ss_wr_i = '1' then
+        if ss_a_i = x"0" then
+          cnt_q <= unsigned(ss_d_i(3 downto 0));
+        end if;
+      elsif clk_en_10m7_i = '1' then
         if cnt_q = 11 then
           -- wrap after counting 12 clocks
           cnt_q <= (others => '0');
@@ -98,6 +107,7 @@ begin
   --
   -----------------------------------------------------------------------------
 
+  ss_d_o <= "0000" & std_logic_vector(cnt_q);
 
   -----------------------------------------------------------------------------
   -- Process clk_en

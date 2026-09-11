@@ -85,7 +85,13 @@ entity vdp18_cpuio is
     reg_col1_o    : out std_logic_vector(0 to  3);
     reg_col0_o    : out std_logic_vector(0 to  3);
     irq_i         : in  boolean;
-    int_n_o       : out std_logic
+    int_n_o       : out std_logic;
+
+    ss_frz_i      : in  std_logic := '0';
+    ss_wr_i       : in  std_logic := '0';
+    ss_a_i        : in  std_logic_vector(3 downto 0) := (others => '0');
+    ss_d_i        : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_o        : out std_logic_vector(7 downto 0)
   );
 
 end vdp18_cpuio;
@@ -144,7 +150,68 @@ architecture rtl of vdp18_cpuio is
   type   read_mux_t is (RDMUX_STATUS, RDMUX_READAHEAD);
   signal read_mux_s : read_mux_t;
 
+  function ss_st2slv(st : state_t) return std_logic_vector is
+  begin
+    case st is
+      when ST_IDLE                => return x"0";
+      when ST_RD_MODE0            => return x"1";
+      when ST_WR_MODE0            => return x"2";
+      when ST_RD_MODE1            => return x"3";
+      when ST_WR_MODE1_1ST        => return x"4";
+      when ST_WR_MODE1_1ST_IDLE   => return x"5";
+      when ST_WR_MODE1_2ND_VREAD  => return x"6";
+      when ST_WR_MODE1_2ND_VWRITE => return x"7";
+      when ST_WR_MODE1_2ND_RWRITE => return x"8";
+    end case;
+  end;
+
+  function ss_slv2st(v : std_logic_vector(3 downto 0)) return state_t is
+  begin
+    case v is
+      when x"1"   => return ST_RD_MODE0;
+      when x"2"   => return ST_WR_MODE0;
+      when x"3"   => return ST_RD_MODE1;
+      when x"4"   => return ST_WR_MODE1_1ST;
+      when x"5"   => return ST_WR_MODE1_1ST_IDLE;
+      when x"6"   => return ST_WR_MODE1_2ND_VREAD;
+      when x"7"   => return ST_WR_MODE1_2ND_VWRITE;
+      when x"8"   => return ST_WR_MODE1_2ND_RWRITE;
+      when others => return ST_IDLE;
+    end case;
+  end;
+
+  function ss_b(b : boolean) return std_logic is
+  begin
+    if b then return '1'; else return '0'; end if;
+  end;
+
 begin
+
+  ss_read: process (ss_a_i, ctrl_reg_q, tmp_q, buffer_q, addr_q, state_q,
+                    rdvram_sched_q, rdvram_q, wrvram_sched_q, wrvram_q,
+                    int_n_q, sprite_coll_q, sprite_5th_q, sprite_5th_num_q)
+  begin
+    case ss_a_i is
+      when x"0" => ss_d_o <= ctrl_reg_q(0);
+      when x"1" => ss_d_o <= ctrl_reg_q(1);
+      when x"2" => ss_d_o <= ctrl_reg_q(2);
+      when x"3" => ss_d_o <= ctrl_reg_q(3);
+      when x"4" => ss_d_o <= ctrl_reg_q(4);
+      when x"5" => ss_d_o <= ctrl_reg_q(5);
+      when x"6" => ss_d_o <= ctrl_reg_q(6);
+      when x"7" => ss_d_o <= ctrl_reg_q(7);
+      when x"8" => ss_d_o <= tmp_q;
+      when x"9" => ss_d_o <= buffer_q;
+      when x"A" => ss_d_o <= std_logic_vector(addr_q(6 to 13));
+      when x"B" => ss_d_o <= "00" & std_logic_vector(addr_q(0 to 5));
+      when x"C" => ss_d_o <= ss_b(wrvram_q) & ss_b(wrvram_sched_q) &
+                             ss_b(rdvram_q) & ss_b(rdvram_sched_q) &
+                             ss_st2slv(state_q);
+      when x"D" => ss_d_o <= int_n_q & ss_b(sprite_coll_q) &
+                             ss_b(sprite_5th_q) & sprite_5th_num_q;
+      when others => ss_d_o <= (others => '0');
+    end case;
+  end process ss_read;
 
   -----------------------------------------------------------------------------
   -- Process seq
@@ -168,7 +235,23 @@ begin
       -- default assignments
       incr_addr_v  := incr_addr_s;
 
-      if clk_en_10m7_i then
+      if ss_wr_i = '1' then
+        case ss_a_i is
+          when x"9" => buffer_q <= ss_d_i;
+          when x"A" => addr_q(6 to 13) <= unsigned(ss_d_i);
+          when x"B" => addr_q(0 to  5) <= unsigned(ss_d_i(5 downto 0));
+          when x"C" => state_q        <= ss_slv2st(ss_d_i(3 downto 0));
+                       rdvram_sched_q <= ss_d_i(4) = '1';
+                       rdvram_q       <= ss_d_i(5) = '1';
+                       wrvram_sched_q <= ss_d_i(6) = '1';
+                       wrvram_q       <= ss_d_i(7) = '1';
+          when others => null;
+        end case;
+
+      elsif ss_frz_i = '1' then
+        null;
+
+      elsif clk_en_10m7_i then
         -- update state vector ------------------------------------------------
         state_q <= state_s;
 
@@ -284,6 +367,28 @@ begin
       int_n_q          <= '1';
 
     elsif clk_i'event and clk_i = '1' then
+      if ss_wr_i = '1' then
+        case ss_a_i is
+          when x"0" => ctrl_reg_q(0) <= ss_d_i;
+          when x"1" => ctrl_reg_q(1) <= ss_d_i;
+          when x"2" => ctrl_reg_q(2) <= ss_d_i;
+          when x"3" => ctrl_reg_q(3) <= ss_d_i;
+          when x"4" => ctrl_reg_q(4) <= ss_d_i;
+          when x"5" => ctrl_reg_q(5) <= ss_d_i;
+          when x"6" => ctrl_reg_q(6) <= ss_d_i;
+          when x"7" => ctrl_reg_q(7) <= ss_d_i;
+          when x"8" => tmp_q         <= ss_d_i;
+          when x"D" => int_n_q          <= ss_d_i(7);
+                       sprite_coll_q    <= ss_d_i(6) = '1';
+                       sprite_5th_q     <= ss_d_i(5) = '1';
+                       sprite_5th_num_q <= ss_d_i(4 downto 0);
+          when others => null;
+        end case;
+
+      elsif ss_frz_i = '1' then
+        null;
+
+      else
       if clk_en_10m7_i then
         -- Temporary register -------------------------------------------------
         if write_tmp_s then
@@ -318,6 +423,7 @@ begin
         int_n_q <= '0';
       elsif destr_rd_status_s then
         int_n_q <= '1';
+      end if;
       end if;
     end if;
   end process reg_if;

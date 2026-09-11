@@ -159,6 +159,11 @@ generic                 -- Non-custom PSG address mask is 0000.
 port
    ( clk_i              : in     std_logic -- system clock
    ; en_clk_psg_i       : in     std_logic -- PSG clock enable
+
+   ; ss_wr_i            : in     std_logic := '0'
+   ; ss_a_i             : in     std_logic_vector(4 downto 0) := (others => '0')
+   ; ss_d_i             : in     std_logic_vector(7 downto 0) := (others => '0')
+   ; ss_d_o             : out    std_logic_vector(7 downto 0)
    ; sel_n_i            : in     std_logic -- divide select, 0=clock-enable/2
    ; reset_n_i          : in     std_logic -- active low
    ; bc_i               : in     std_logic -- bus control
@@ -386,8 +391,41 @@ begin
    -- Registered data output.
    data_r_o <= data_o_r;
 
-
    -- -----------------------------------------------------------------------
+   --
+   ss_read : process
+   ( ss_a_i, reg_file_ar, reg_addr_r, data_o_r
+   , ch_a_level_r, ch_b_level_r, ch_c_level_r
+   ) begin
+      case ss_a_i is
+      when "00000" => ss_d_o <= reg_file_ar(0);
+      when "00001" => ss_d_o <= reg_file_ar(1);
+      when "00010" => ss_d_o <= reg_file_ar(2);
+      when "00011" => ss_d_o <= reg_file_ar(3);
+      when "00100" => ss_d_o <= reg_file_ar(4);
+      when "00101" => ss_d_o <= reg_file_ar(5);
+      when "00110" => ss_d_o <= reg_file_ar(6);
+      when "00111" => ss_d_o <= reg_file_ar(7);
+      when "01000" => ss_d_o <= reg_file_ar(8);
+      when "01001" => ss_d_o <= reg_file_ar(9);
+      when "01010" => ss_d_o <= reg_file_ar(10);
+      when "01011" => ss_d_o <= reg_file_ar(11);
+      when "01100" => ss_d_o <= reg_file_ar(12);
+      when "01101" => ss_d_o <= reg_file_ar(13);
+      when "01110" => ss_d_o <= reg_file_ar(14);
+      when "01111" => ss_d_o <= reg_file_ar(15);
+      when "10000" => ss_d_o <= "0000" & std_logic_vector(reg_addr_r);
+      when "10001" => ss_d_o <= std_logic_vector(ch_a_level_r(7 downto 0));
+      when "10010" => ss_d_o <= "0000" & std_logic_vector(ch_a_level_r(11 downto 8));
+      when "10011" => ss_d_o <= std_logic_vector(ch_b_level_r(7 downto 0));
+      when "10100" => ss_d_o <= "0000" & std_logic_vector(ch_b_level_r(11 downto 8));
+      when "10101" => ss_d_o <= std_logic_vector(ch_c_level_r(7 downto 0));
+      when "10110" => ss_d_o <= "0000" & std_logic_vector(ch_c_level_r(11 downto 8));
+      when "10111" => ss_d_o <= data_o_r;
+      when others  => ss_d_o <= (others => '0');
+      end case;
+   end process ss_read;
+
    --
    -- External bus interface and register file.
    --
@@ -483,7 +521,36 @@ begin
    ( clk_i, en_clk_psg_i, reset_n_i
    ) begin
    if rising_edge(clk_i) then
-      if reset_n_i = '0' then
+      if ss_wr_i = '1' then
+         case ss_a_i is
+         when "00000" => reg_file_ar(0)  <= ss_d_i;
+         when "00001" => reg_file_ar(1)  <= ss_d_i;
+         when "00010" => reg_file_ar(2)  <= ss_d_i;
+         when "00011" => reg_file_ar(3)  <= ss_d_i;
+         when "00100" => reg_file_ar(4)  <= ss_d_i;
+         when "00101" => reg_file_ar(5)  <= ss_d_i;
+         when "00110" => reg_file_ar(6)  <= ss_d_i;
+         when "00111" => reg_file_ar(7)  <= ss_d_i;
+         when "01000" => reg_file_ar(8)  <= ss_d_i;
+         when "01001" => reg_file_ar(9)  <= ss_d_i;
+         when "01010" => reg_file_ar(10) <= ss_d_i;
+         when "01011" => reg_file_ar(11) <= ss_d_i;
+         when "01100" => reg_file_ar(12) <= ss_d_i;
+         when "01101" => reg_file_ar(13) <= ss_d_i;
+         when "01110" => reg_file_ar(14) <= ss_d_i;
+         when "01111" => reg_file_ar(15) <= ss_d_i;
+         when "10000" => reg_addr_r <= unsigned(ss_d_i(3 downto 0));
+         when "10001" => ch_a_level_r(7 downto 0)  <= unsigned(ss_d_i);
+         when "10010" => ch_a_level_r(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+         when "10011" => ch_b_level_r(7 downto 0)  <= unsigned(ss_d_i);
+         when "10100" => ch_b_level_r(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+         when "10101" => ch_c_level_r(7 downto 0)  <= unsigned(ss_d_i);
+         when "10110" => ch_c_level_r(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+         when "10111" => data_o_r <= ss_d_i;
+         when others  => null;
+         end case;
+
+      elsif reset_n_i = '0' then
 
          reg_addr_r      <= (others => '0');
          data_o_r        <= (others => '0');

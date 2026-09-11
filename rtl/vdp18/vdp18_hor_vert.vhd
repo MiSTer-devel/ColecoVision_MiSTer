@@ -68,7 +68,13 @@ entity vdp18_hor_vert is
     vsync_n_o     : out std_logic;
     blank_o       : out boolean;
     hblank_o      : out boolean;
-    vblank_o      : out boolean
+    vblank_o      : out boolean;
+
+    ss_frz_i      : in  std_logic := '0';
+    ss_wr_i       : in  std_logic := '0';
+    ss_a_i        : in  std_logic_vector(3 downto 0) := (others => '0');
+    ss_d_i        : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_o        : out std_logic_vector(7 downto 0)
   );
 
 end vdp18_hor_vert;
@@ -89,10 +95,27 @@ architecture rtl of vdp18_hor_vert is
 
   signal vert_inc_s   : boolean;
 
+  function ss_b(b : boolean) return std_logic is
+  begin
+    if b then return '1'; else return '0'; end if;
+  end;
+
   signal hblank_q,
          vblank_q     : boolean;
 
 begin
+
+  ss_read: process (ss_a_i, cnt_hor_q, cnt_vert_q, hblank_q, vblank_q)
+  begin
+    case ss_a_i is
+      when x"0"   => ss_d_o <= std_logic_vector(cnt_hor_q(1 to 8));
+      when x"1"   => ss_d_o <= "0000000" & std_logic_vector(cnt_hor_q(0 to 0));
+      when x"2"   => ss_d_o <= std_logic_vector(cnt_vert_q(1 to 8));
+      when x"3"   => ss_d_o <= "0000000" & std_logic_vector(cnt_vert_q(0 to 0));
+      when x"4"   => ss_d_o <= "000000" & ss_b(vblank_q) & ss_b(hblank_q);
+      when others => ss_d_o <= (others => '0');
+    end case;
+  end process ss_read;
 
   -----------------------------------------------------------------------------
   -- Prepare comparison signals for NTSC and PAL.
@@ -148,7 +171,19 @@ begin
       vblank_q   <= false;
 
     elsif clk_i'event and clk_i = '1' then
-      if clk_en_5m37_i then
+      if ss_wr_i = '1' then
+        case ss_a_i is
+          when x"0" => cnt_hor_q(1 to 8)  <= signed(ss_d_i);
+          when x"1" => cnt_hor_q(0 to 0)  <= signed(ss_d_i(0 downto 0));
+          when x"2" => cnt_vert_q(1 to 8) <= signed(ss_d_i);
+          when x"3" => cnt_vert_q(0 to 0) <= signed(ss_d_i(0 downto 0));
+          when x"4" => hblank_q <= ss_d_i(0) = '1';
+                       vblank_q <= ss_d_i(1) = '1';
+          when others => null;
+        end case;
+      elsif ss_frz_i = '1' then
+        null;
+      elsif clk_en_5m37_i then
         -- The horizontal counter ---------------------------------------------
         if cnt_hor_q = last_pix_s then
           cnt_hor_q  <= first_pix_s;

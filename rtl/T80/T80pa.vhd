@@ -84,7 +84,14 @@ entity T80pa is
 		DO          : out std_logic_vector(7 downto 0);
 		REG         : out std_logic_vector(211 downto 0); -- IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
 		DIRSet      : in  std_logic := '0';
-		DIR         : in  std_logic_vector(211 downto 0) := (others => '0') -- IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+		DIR         : in  std_logic_vector(211 downto 0) := (others => '0');
+
+		SS_WZ_o     : out std_logic_vector(15 downto 0);
+		SS_NMI_o    : out std_logic;
+		SS_WZ_i     : in  std_logic_vector(15 downto 0) := (others => '0');
+		SS_NMI_i    : in  std_logic := '0';
+		SS_MC_o     : out std_logic_vector(2 downto 0);
+		SS_TS_o     : out std_logic_vector(2 downto 0)
 	);
 end T80pa;
 
@@ -139,8 +146,15 @@ begin
 			OUT0    => OUT0,
 			IntCycle_n => IntCycle_n,
 			DIRSet  => DIRSet,
-			DIR     => DIR
+			DIR     => DIR,
+			SS_WZ_o  => SS_WZ_o,
+			SS_NMI_o => SS_NMI_o,
+			SS_WZ_i  => SS_WZ_i,
+			SS_NMI_i => SS_NMI_i
 		);
+
+	SS_MC_o <= MCycle;
+	SS_TS_o <= TState;
 
 	process(CLK)
 	begin
@@ -152,6 +166,14 @@ begin
 				MREQ_n  <= '1';
 				DI_Reg  <= "00000000";
 				CEN_pol <= '0';
+			elsif DIRSet = '1' then
+				WR_n    <= '1';
+				RD_n    <= '1';
+				IORQ_n  <= '1';
+				MREQ_n  <= '1';
+				DI_Reg  <= "00000000";
+				CEN_pol <= '0';
+				IntCycleD_n <= "11";
 			elsif CEN_p = '1' and CEN_pol = '0' then
 				CEN_pol <= '1';
 				if MCycle = "001" then

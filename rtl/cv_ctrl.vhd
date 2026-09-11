@@ -67,7 +67,13 @@ entity cv_ctrl is
     ctrl_p8_o       : out std_logic_vector(2 downto 1);
     ctrl_p9_i       : in  std_logic_vector(2 downto 1);
     d_o             : out std_logic_vector(7 downto 0);
-    int_n_o         : out std_logic
+    int_n_o         : out std_logic;
+
+    ss_frz_i        : in  std_logic := '0';
+    ss_wr_i         : in  std_logic := '0';
+    ss_a_i          : in  std_logic_vector(3 downto 0) := (others => '0');
+    ss_d_i          : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_o          : out std_logic_vector(7 downto 0)
   );
 
 end cv_ctrl;
@@ -88,6 +94,19 @@ architecture rtl of cv_ctrl is
 begin
 
   -----------------------------------------------------------------------------
+  ss_read: process (ss_a_i, sel_q, nand_o_d, nand_i2, int, rctimer)
+  begin
+    case ss_a_i is
+      when x"0" => ss_d_o <= '0' & int(2) & int(1) & nand_i2(2) & nand_i2(1) &
+                             nand_o_d(2) & nand_o_d(1) & sel_q;
+      when x"1" => ss_d_o <= std_logic_vector(rctimer(1)(7 downto 0));
+      when x"2" => ss_d_o <= "0000" & std_logic_vector(rctimer(1)(11 downto 8));
+      when x"3" => ss_d_o <= std_logic_vector(rctimer(2)(7 downto 0));
+      when x"4" => ss_d_o <= "0000" & std_logic_vector(rctimer(2)(11 downto 8));
+      when others => ss_d_o <= (others => '0');
+    end case;
+  end process ss_read;
+
   -- Process seq
   --
   -- Purpose:
@@ -100,7 +119,13 @@ begin
       sel_q <= '0';
 
     elsif clk_i'event and clk_i = '1' then
-      if clk_en_3m58_i = '1' then
+      if ss_wr_i = '1' then
+        if ss_a_i = x"0" then
+          sel_q <= ss_d_i(0);
+        end if;
+      elsif ss_frz_i = '1' then
+        null;
+      elsif clk_en_3m58_i = '1' then
         ctrl_en_v := ctrl_en_key_n_i & ctrl_en_joy_n_i;
         case ctrl_en_v is
           when "01" =>
@@ -150,6 +175,23 @@ begin
         nand_i1(idx) <= ctrl_p9_i(idx);
         nand_o(idx) <= not (nand_i1(idx) and nand_i2(idx));
         if rising_edge(clk_i) then
+          if ss_wr_i = '1' then
+            if ss_a_i = x"0" then
+              nand_o_d(idx) <= ss_d_i(idx);
+              nand_i2(idx)  <= ss_d_i(idx+2);
+              int(idx)      <= ss_d_i(idx+4);
+            elsif idx = 1 then
+              if    ss_a_i = x"1" then rctimer(1)( 7 downto 0) <= unsigned(ss_d_i);
+              elsif ss_a_i = x"2" then rctimer(1)(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+              end if;
+            else
+              if    ss_a_i = x"3" then rctimer(2)( 7 downto 0) <= unsigned(ss_d_i);
+              elsif ss_a_i = x"4" then rctimer(2)(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+              end if;
+            end if;
+          elsif ss_frz_i = '1' then
+            null;
+          else
             int(idx) <= '0';
             nand_o_d(idx) <= nand_o(idx);
             if rctimer(idx) = 0 then
@@ -169,6 +211,7 @@ begin
             if rctimer(idx) /= 0 then
                 rctimer(idx) <= rctimer(idx) - 1;
             end if;
+          end if;
         end if;
     end loop;
     int_n_o <= not (int(1) or int(2));

@@ -1,5 +1,7 @@
 set_global_assignment -name QIP_FILE rtl/T80/T80.qip
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestate.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestate_keys.sv
 set_global_assignment -name VHDL_FILE rtl/bram.vhd
 set_global_assignment -name VHDL_FILE rtl/sn76489_audio.vhd
 set_global_assignment -name VHDL_FILE rtl/ym2149_audio.vhd

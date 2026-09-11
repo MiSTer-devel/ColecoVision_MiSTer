@@ -124,6 +124,16 @@ entity cv_console is
     vblank_o        : out std_logic;
     comp_sync_n_o   : out std_logic;
     -- Audio Interface --------------------------------------------------------
+    ss_frz_i        : in  std_logic := '0';
+    ss_wr_i         : in  std_logic := '0';
+    ss_a_i          : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_i          : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_o          : out std_logic_vector(7 downto 0);
+    ss_cpuset_i     : in  std_logic := '0';
+    ss_cpu_cen_p_i  : in  std_logic := '0';
+    ss_cpu_cen_n_i  : in  std_logic := '0';
+    ss_bnd_o        : out std_logic;
+
     audio_o         : out unsigned(13 downto 0)
   );
 
@@ -199,6 +209,30 @@ architecture struct of cv_console is
   -- misc signals
   signal vdd_s            : std_logic;
 
+  type   ss_cpu_arr_t is array (0 to 31) of std_logic_vector(7 downto 0);
+  signal ss_cpu_q         : ss_cpu_arr_t;
+  signal ss_dir_s         : std_logic_vector(211 downto 0);
+  signal cpu_reg_s        : std_logic_vector(211 downto 0);
+  signal cpu_wz_s         : std_logic_vector(15 downto 0);
+  signal cpu_nmi_s        : std_logic;
+  signal cpu_mc_s         : std_logic_vector(2 downto 0);
+  signal cpu_ts_s         : std_logic_vector(2 downto 0);
+  signal cpu_cen_p_s      : std_logic;
+  signal cpu_cen_n_s      : std_logic;
+  signal ss_d_cpu_s       : std_logic_vector(7 downto 0);
+  signal ss_d_vdp_s       : std_logic_vector(7 downto 0);
+  signal ss_d_clk_s       : std_logic_vector(7 downto 0);
+  signal ss_d_dec_s       : std_logic_vector(7 downto 0);
+  signal ss_d_ctrl_s      : std_logic_vector(7 downto 0);
+  signal ss_d_psgb_s      : std_logic_vector(7 downto 0);
+  signal ss_d_psga_s      : std_logic_vector(7 downto 0);
+  signal ss_wr_vdp_s      : std_logic;
+  signal ss_wr_clk_s      : std_logic;
+  signal ss_wr_dec_s      : std_logic;
+  signal ss_wr_ctrl_s     : std_logic;
+  signal ss_wr_psgb_s     : std_logic;
+  signal ss_wr_psga_s     : std_logic;
+
   -- pragma translate_off
   file logfile: text is out "access.txt";
   -- pragma translate_on
@@ -231,7 +265,11 @@ begin
       clk_en_10m7_i => clk_en_10m7_i,
       reset_n_i     => reset_n_s,
       clk_en_3m58_p_o => clk_en_3m58_p_s,
-      clk_en_3m58_n_o => clk_en_3m58_n_s
+      clk_en_3m58_n_o => clk_en_3m58_n_s,
+      ss_wr_i         => ss_wr_clk_s,
+      ss_a_i          => ss_a_i(3 downto 0),
+      ss_d_i          => ss_d_i,
+      ss_d_o          => ss_d_clk_s
     );
 
   -----------------------------------------------------------------------------
@@ -244,8 +282,8 @@ begin
     port map(
       RESET_n    => reset_n_s,
       CLK        => clk_i,
-      CEN_p      => clk_en_3m58_p_s,
-      CEN_n      => clk_en_3m58_n_s,
+      CEN_p      => cpu_cen_p_s,
+      CEN_n      => cpu_cen_n_s,
       WAIT_n     => wait_n_s,
       INT_n      => int_n_s,
       NMI_n      => nmi_n_s,
@@ -260,10 +298,93 @@ begin
       BUSAK_n    => open,
       A          => a_s,
       DI         => d_to_cpu_s,
-      DO         => d_from_cpu_s
+      DO         => d_from_cpu_s,
+      REG        => cpu_reg_s,
+      DIRSet     => ss_cpuset_i,
+      DIR        => ss_dir_s,
+      SS_WZ_o    => cpu_wz_s,
+      SS_NMI_o   => cpu_nmi_s,
+      SS_WZ_i    => ss_cpu_q(27) & ss_cpu_q(28),
+      SS_NMI_i   => ss_cpu_q(29)(0),
+      SS_MC_o    => cpu_mc_s,
+      SS_TS_o    => cpu_ts_s
     );
 
+  cpu_cen_p_s <= clk_en_3m58_p_s or ss_cpu_cen_p_i;
+  cpu_cen_n_s <= clk_en_3m58_n_s or ss_cpu_cen_n_i;
 
+  ss_bnd_o <= '1' when cpu_mc_s = "001" and cpu_ts_s = "010" and wait_n_s = '1'
+              else '0';
+
+  ss_wr_vdp_s  <= ss_wr_i when ss_a_i(7 downto 4) = x"4" or
+                                ss_a_i(7 downto 4) = x"5" or
+                                ss_a_i(7 downto 4) = x"6" else '0';
+  ss_wr_clk_s  <= ss_wr_i when ss_a_i(7 downto 4) = x"7" else '0';
+  ss_wr_dec_s  <= ss_wr_i when ss_a_i(7 downto 4) = x"8" else '0';
+  ss_wr_ctrl_s <= ss_wr_i when ss_a_i(7 downto 4) = x"9" else '0';
+  ss_wr_psgb_s <= ss_wr_i when ss_a_i(7 downto 5) = "101" else '0';
+  ss_wr_psga_s <= ss_wr_i when ss_a_i(7 downto 5) = "110" else '0';
+
+  ss_cpu_wr: process (clk_i)
+  begin
+    if rising_edge(clk_i) then
+      if ss_wr_i = '1' and ss_a_i(7 downto 5) = "001" then
+        ss_cpu_q(to_integer(unsigned(ss_a_i(4 downto 0)))) <= ss_d_i;
+      end if;
+    end if;
+  end process ss_cpu_wr;
+
+  ss_dir_s <= ss_cpu_q(26)(3 downto 0) & ss_cpu_q(25) & ss_cpu_q(24) & ss_cpu_q(23) & ss_cpu_q(22) & ss_cpu_q(21) & ss_cpu_q(20) & ss_cpu_q(19) & ss_cpu_q(18) & ss_cpu_q(17) & ss_cpu_q(16) & ss_cpu_q(15) & ss_cpu_q(14) & ss_cpu_q(13) & ss_cpu_q(12) & ss_cpu_q(11) & ss_cpu_q(10) & ss_cpu_q(9) & ss_cpu_q(8) & ss_cpu_q(7) & ss_cpu_q(6) & ss_cpu_q(5) & ss_cpu_q(4) & ss_cpu_q(3) & ss_cpu_q(2) & ss_cpu_q(1) & ss_cpu_q(0);
+
+  ss_cpu_rd: process (ss_a_i, cpu_reg_s, cpu_wz_s, cpu_nmi_s)
+  begin
+    case ss_a_i(4 downto 0) is
+      when "00000" => ss_d_cpu_s <= cpu_reg_s(7 downto 0);
+      when "00001" => ss_d_cpu_s <= cpu_reg_s(15 downto 8);
+      when "00010" => ss_d_cpu_s <= cpu_reg_s(23 downto 16);
+      when "00011" => ss_d_cpu_s <= cpu_reg_s(31 downto 24);
+      when "00100" => ss_d_cpu_s <= cpu_reg_s(39 downto 32);
+      when "00101" => ss_d_cpu_s <= cpu_reg_s(47 downto 40);
+      when "00110" => ss_d_cpu_s <= cpu_reg_s(55 downto 48);
+      when "00111" => ss_d_cpu_s <= cpu_reg_s(63 downto 56);
+      when "01000" => ss_d_cpu_s <= cpu_reg_s(71 downto 64);
+      when "01001" => ss_d_cpu_s <= cpu_reg_s(79 downto 72);
+      when "01010" => ss_d_cpu_s <= cpu_reg_s(87 downto 80);
+      when "01011" => ss_d_cpu_s <= cpu_reg_s(95 downto 88);
+      when "01100" => ss_d_cpu_s <= cpu_reg_s(103 downto 96);
+      when "01101" => ss_d_cpu_s <= cpu_reg_s(111 downto 104);
+      when "01110" => ss_d_cpu_s <= cpu_reg_s(119 downto 112);
+      when "01111" => ss_d_cpu_s <= cpu_reg_s(127 downto 120);
+      when "10000" => ss_d_cpu_s <= cpu_reg_s(135 downto 128);
+      when "10001" => ss_d_cpu_s <= cpu_reg_s(143 downto 136);
+      when "10010" => ss_d_cpu_s <= cpu_reg_s(151 downto 144);
+      when "10011" => ss_d_cpu_s <= cpu_reg_s(159 downto 152);
+      when "10100" => ss_d_cpu_s <= cpu_reg_s(167 downto 160);
+      when "10101" => ss_d_cpu_s <= cpu_reg_s(175 downto 168);
+      when "10110" => ss_d_cpu_s <= cpu_reg_s(183 downto 176);
+      when "10111" => ss_d_cpu_s <= cpu_reg_s(191 downto 184);
+      when "11000" => ss_d_cpu_s <= cpu_reg_s(199 downto 192);
+      when "11001" => ss_d_cpu_s <= cpu_reg_s(207 downto 200);
+      when "11010" => ss_d_cpu_s <= "0000" & cpu_reg_s(211 downto 208);
+      when "11011" => ss_d_cpu_s <= cpu_wz_s(7 downto 0);
+      when "11100" => ss_d_cpu_s <= cpu_wz_s(15 downto 8);
+      when "11101" => ss_d_cpu_s <= "0000000" & cpu_nmi_s;
+      when others  => ss_d_cpu_s <= (others => '0');
+    end case;
+  end process ss_cpu_rd;
+
+  ss_d_o <= ss_d_cpu_s  when ss_a_i(7 downto 5) = "001" else
+            ss_d_vdp_s  when ss_a_i(7 downto 4) = x"4" or
+                             ss_a_i(7 downto 4) = x"5" or
+                             ss_a_i(7 downto 4) = x"6" else
+            ss_d_clk_s  when ss_a_i(7 downto 4) = x"7" and ss_a_i(3 downto 0) = x"0" else
+            "0000000" & m1_wait_q
+                        when ss_a_i(7 downto 4) = x"7" and ss_a_i(3 downto 0) = x"1" else
+            ss_d_dec_s  when ss_a_i(7 downto 4) = x"8" else
+            ss_d_ctrl_s when ss_a_i(7 downto 4) = x"9" else
+            ss_d_psgb_s when ss_a_i(7 downto 5) = "101" else
+            ss_d_psga_s when ss_a_i(7 downto 5) = "110" else
+            (others => '0');
 
   -----------------------------------------------------------------------------
   -- Process m1_wait
@@ -320,7 +441,12 @@ begin
       border_i      => border_i,
       hblank_o      => hblank_o,
       vblank_o      => vblank_o,
-      comp_sync_n_o => comp_sync_n_o
+      comp_sync_n_o => comp_sync_n_o,
+      ss_frz_i      => ss_frz_i,
+      ss_wr_i       => ss_wr_vdp_s,
+      ss_a_i        => ss_a_i,
+      ss_d_i        => ss_d_i,
+      ss_d_o        => ss_d_vdp_s
     );
 
 
@@ -337,7 +463,11 @@ begin
 		ch_b_o      => ay_ch_b_s,
 		ch_c_o      => ay_ch_c_s,
 		mix_audio_o => psg_a_audio_s,
-		sel_n_i     => '0'
+		sel_n_i     => '0',
+		ss_wr_i     => ss_wr_psga_s,
+		ss_a_i      => ss_a_i(4 downto 0),
+		ss_d_i      => ss_d_i,
+		ss_d_o      => ss_d_psga_s
     );
  
 	 
@@ -356,7 +486,12 @@ begin
       wr_n_i       => psg_we_n_s,
       ready_o      => psg_ready_s,
       data_i       => d_from_cpu_s,
-      mix_audio_o  => psg_b_audio_s
+      mix_audio_o  => psg_b_audio_s,
+      ss_frz_i     => ss_frz_i,
+      ss_wr_i      => ss_wr_psgb_s,
+      ss_a_i       => ss_a_i(4 downto 0),
+      ss_d_i       => ss_d_i,
+      ss_d_o       => ss_d_psgb_s
     );
 
 
@@ -381,7 +516,12 @@ begin
       ctrl_p8_o       => ctrl_p8_o,
       ctrl_p9_i       => ctrl_p9_i,
       d_o             => d_from_ctrl_s,
-		int_n_o         => ctrl_int_n_s
+		int_n_o         => ctrl_int_n_s,
+      ss_frz_i        => ss_frz_i,
+      ss_wr_i         => ss_wr_ctrl_s,
+      ss_a_i          => ss_a_i(3 downto 0),
+      ss_d_i          => ss_d_i,
+      ss_d_o          => ss_d_ctrl_s
     );
 
 
@@ -418,7 +558,12 @@ begin
       cart_en_a0_n_o  => cart_en_a0_n_s,
       cart_en_c0_n_o  => cart_en_c0_n_s,
       cart_en_e0_n_o  => cart_en_e0_n_s,
-      cart_en_sg1000_n_o=> cart_en_sg1000_n_s
+      cart_en_sg1000_n_o=> cart_en_sg1000_n_s,
+      ss_frz_i        => ss_frz_i,
+      ss_wr_i         => ss_wr_dec_s,
+      ss_a_i          => ss_a_i(3 downto 0),
+      ss_d_i          => ss_d_i,
+      ss_d_o          => ss_d_dec_s
     );
 
   bios_rom_ce_n_o <= bios_rom_ce_n_s;

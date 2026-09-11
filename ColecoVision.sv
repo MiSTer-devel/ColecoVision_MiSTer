@@ -30,13 +30,13 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
  
-assign LED_USER   = ioctl_download;
+assign LED_USER   = ioctl_download | ss_busy;
 assign LED_DISK   = 0;
 assign LED_POWER  = 0;
 assign BUTTONS    = 0;
 assign VGA_SCALER = 0;
 assign VGA_DISABLE= 0;
-assign HDMI_FREEZE= 0;
+assign HDMI_FREEZE= ss_frz;
 
 wire [1:0] ar = status[2:1];
 wire vga_de;
@@ -70,8 +70,13 @@ parameter CONF_STR = {
 	"O3,Joysticks swap,No,Yes;",
 	"-;",
 	"O45,RAM Size,1KB,8KB,SGM;",
+	"-;",
+	"S0,SST,Savestate file;",
+	"RF,Save state (Shift+F1-F8);",
+	"RG,Load state (F1-F8);",
+	"-;",
 	"R0,Reset;",
-	"J1,Fire 1,Fire 2,*,#,0,1,2,3,4,5,6,7,8,9,Purple Tr,Blue Tr;",
+	"J1,Fire 1,Fire 2,*,#,0,1,2,3,4,5,6,7,8,9,Purple Tr,Blue Tr,Save state,Load state;",
 	"V,v",`BUILD_DATE
 };
 
@@ -92,10 +97,10 @@ reg ce_10m7 = 0;
 reg ce_5m3 = 0;
 always @(posedge clk_sys) begin
 	reg [2:0] div;
-	
+
 	div <= div+1'd1;
-	ce_10m7 <= !div[1:0];
-	ce_5m3  <= !div[2:0];
+	ce_10m7 <= !div[1:0] & ~ss_frz;
+	ce_5m3  <= !div[2:0] & ~ss_frz;
 end
 
 /////////////////  HPS  ///////////////////////////
@@ -112,6 +117,20 @@ wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire        forced_scandoubler;
 wire [21:0] gamma_bus;
+wire [10:0] ps2_key;
+
+wire [31:0] sd_lba[1];
+wire  [5:0] sd_blk_cnt[1];
+wire        sd_rd;
+wire        sd_wr;
+wire        sd_ack;
+wire [13:0] sd_buff_addr;
+wire  [7:0] sd_buff_dout;
+wire  [7:0] sd_buff_din[1];
+wire        sd_buff_wr;
+wire        img_mounted;
+wire        img_readonly;
+wire [63:0] img_size;
  
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -130,7 +149,22 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_dout(ioctl_dout),
 
 	.joystick_0(joy0),
-	.joystick_1(joy1)
+	.joystick_1(joy1),
+	.ps2_key(ps2_key),
+
+	.img_mounted(img_mounted),
+	.img_readonly(img_readonly),
+	.img_size(img_size),
+
+	.sd_lba(sd_lba),
+	.sd_blk_cnt(sd_blk_cnt),
+	.sd_rd(sd_rd),
+	.sd_wr(sd_wr),
+	.sd_ack(sd_ack),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din),
+	.sd_buff_wr(sd_buff_wr)
 );
 
 /////////////////  RESET  /////////////////////////
@@ -154,18 +188,20 @@ wire        ram_we_n, ram_ce_n;
 wire  [7:0] ram_di;
 wire  [7:0] ram_do;
 
-wire [14:0] ram_a = (extram)            ? cpu_ram_a       :
-                    (status[5:4] == 1)  ? cpu_ram_a[12:0] : // 8k
-                    (status[5:4] == 0)  ? cpu_ram_a[9:0]  : // 1k
-                    (sg1000)            ? cpu_ram_a[12:0] : // SGM means 8k on SG1000
-                                          cpu_ram_a;        // SGM/32k
+wire [14:0] ram_a_cpu = (extram)            ? cpu_ram_a       :
+                        (status[5:4] == 1)  ? cpu_ram_a[12:0] :
+                        (status[5:4] == 0)  ? cpu_ram_a[9:0]  :
+                        (sg1000)            ? cpu_ram_a[12:0] :
+                                              cpu_ram_a;
+
+wire [14:0] ram_a = ss_ram_sel ? ss_ram_a : ram_a_cpu;
 
 spram #(15) ram
 (
 	.clock(clk_sys),
 	.address(ram_a),
-	.wren(ce_10m7 & ~(ram_we_n | ram_ce_n)),
-	.data(ram_do),
+	.wren(ss_ram_sel ? (sd_buff_wr & ss_loading) : (ce_10m7 & ~(ram_we_n | ram_ce_n))),
+	.data(ss_ram_sel ? sd_buff_dout : ram_do),
 	.q(ram_di)
 );
 
@@ -177,9 +213,9 @@ wire  [7:0] vram_do;
 spram #(14) vram
 (
 	.clock(clk_sys),
-	.address(vram_a),
-	.wren(vram_we),
-	.data(vram_do),
+	.address(ss_vram_sel ? ss_vram_a : vram_a),
+	.wren(ss_vram_sel ? (sd_buff_wr & ss_loading) : vram_we),
+	.data(ss_vram_sel ? sd_buff_dout : vram_do),
 	.q(vram_di)
 );
 
@@ -189,6 +225,21 @@ wire        cart_rd;
 
 reg [5:0] cart_pages;
 always @(posedge clk_sys) if(ioctl_wr) cart_pages <= ioctl_addr[19:14];
+
+reg [31:0] rom_sum;
+reg [24:0] rom_len;
+always @(posedge clk_sys) begin
+	if(ioctl_wr) begin
+		if(!ioctl_addr) begin
+			rom_sum <= ioctl_dout;
+			rom_len <= 1;
+		end
+		else begin
+			rom_sum <= {rom_sum[30:0], rom_sum[31]} + ioctl_dout;
+			rom_len <= ioctl_addr + 1'd1;
+		end
+	end
+end
 
 assign SDRAM_CLK = ~clk_sys;
 sdram sdram
@@ -286,6 +337,16 @@ cv_console console
 	.cart_d_i(cart_d),
 	.cart_rd(cart_rd),
 
+	.ss_frz_i(ss_frz),
+	.ss_wr_i(ss_reg_wr),
+	.ss_a_i(sd_buff_addr[7:0]),
+	.ss_d_i(sd_buff_dout),
+	.ss_d_o(ss_reg_dout),
+	.ss_cpuset_i(ss_cpuset),
+	.ss_cpu_cen_p_i(ss_cen_p),
+	.ss_cpu_cen_n_i(ss_cen_n),
+	.ss_bnd_o(ss_bnd),
+
 	.border_i(status[6]),
 	.rgb_r_o(R),
 	.rgb_g_o(G),
@@ -332,7 +393,85 @@ video_mixer #(.LINE_LENGTH(290), .GAMMA(1)) video_mixer
 	.VBlank(vblank)
 );
 
+wire        ss_bnd;
+wire  [7:0] ss_reg_dout;
+wire        ss_frz;
+wire        ss_busy;
+wire        ss_loading;
+wire        ss_reg_wr;
+wire        ss_cpuset;
+wire        ss_cen_p;
+wire        ss_cen_n;
+wire        ss_ram_sel;
+wire        ss_vram_sel;
+wire [14:0] ss_ram_a;
+wire [13:0] ss_vram_a;
 
+reg         ss_mounted = 0;
+always @(posedge clk_sys) if(img_mounted) ss_mounted <= |img_size;
+
+wire       ss_key_save, ss_key_load;
+wire [2:0] ss_slot;
+
+savestate_keys savestate_keys
+(
+	.clk(clk_sys),
+	.enable(~OSD_STATUS),
+	.ps2_key(ps2_key),
+	.joy_save(joy0[20] | joy1[20]),
+	.joy_load(joy0[21] | joy1[21]),
+	.save(ss_key_save),
+	.load(ss_key_load),
+	.slot(ss_slot)
+);
+
+savestate savestate
+(
+	.clk(clk_sys),
+	.reset(reset),
+
+	.save_req(status[15] | ss_key_save),
+	.load_req(status[16] | ss_key_load),
+	.slot(ss_slot),
+	.mounted(ss_mounted),
+	.readonly(img_readonly),
+
+	.bnd(ss_bnd),
+	.frz(ss_frz),
+	.cpuset(ss_cpuset),
+	.cen_p(ss_cen_p),
+	.cen_n(ss_cen_n),
+	.busy(ss_busy),
+	.loading(ss_loading),
+
+	.rom_sum(rom_sum),
+	.rom_len(rom_len),
+	.cart_pages(cart_pages),
+	.sg1000(sg1000),
+	.extram(extram),
+	.ram_size(status[5:4]),
+
+	.reg_wr(ss_reg_wr),
+	.reg_dout(ss_reg_dout),
+
+	.ram_sel(ss_ram_sel),
+	.vram_sel(ss_vram_sel),
+	.ram_a(ss_ram_a),
+	.vram_a(ss_vram_a),
+	.ram_di(ram_di),
+	.vram_di(vram_di),
+
+	.sd_lba(sd_lba[0]),
+	.sd_rd(sd_rd),
+	.sd_wr(sd_wr),
+	.sd_ack(sd_ack),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din[0]),
+	.sd_buff_wr(sd_buff_wr)
+);
+
+assign sd_blk_cnt[0] = 0;
 
 ////////////////  Control  ////////////////////////
 

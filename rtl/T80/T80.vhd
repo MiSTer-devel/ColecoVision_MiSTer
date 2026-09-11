@@ -121,7 +121,12 @@ entity T80 is
 		REG        : out std_logic_vector(211 downto 0); -- IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
 
 		DIRSet     : in  std_logic := '0';
-		DIR        : in  std_logic_vector(211 downto 0) := (others => '0') -- IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+		DIR        : in  std_logic_vector(211 downto 0) := (others => '0');
+
+		SS_WZ_o    : out std_logic_vector(15 downto 0);
+		SS_NMI_o   : out std_logic;
+		SS_WZ_i    : in  std_logic_vector(15 downto 0) := (others => '0');
+		SS_NMI_i   : in  std_logic := '0'
 	);
 end T80;
 
@@ -257,6 +262,8 @@ architecture rtl of T80 is
 	signal DOR                  : std_logic_vector(127 downto 0);
 
 begin
+
+	SS_WZ_o <= WZ;
 
 	REG <= IntE_FF2 & IntE_FF1 & IStatus & DOR & std_logic_vector(PC) & std_logic_vector(SP) & std_logic_vector(R) & I & Fp & Ap & F & ACC when Alternate = '0'
 			 else IntE_FF2 & IntE_FF1 & IStatus & DOR(127 downto 112) & DOR(47 downto 0) & DOR(63 downto 48) & DOR(111 downto 64) &
@@ -415,6 +422,22 @@ begin
 				PC  <= unsigned(DIR(79 downto 64));
 				A   <= DIR(79 downto 64);
 				IStatus <= DIR(209 downto 208);
+				WZ  <= SS_WZ_i;
+				IR  <= "00000000";
+				ISet <= "00";
+				XY_State <= "00";
+				XY_Ind <= '0';
+				MCycles <= "000";
+				DO <= "00000000";
+				Alternate <= '0';
+				Read_To_Reg_r <= "00000";
+				Arith16_r <= '0';
+				BTR_r <= '0';
+				Z16_r <= '0';
+				ALU_Op_r <= "0000";
+				Save_ALU_r <= '0';
+				PreserveC_r <= '0';
+				I_RXDD <= '0';
 
 			elsif ClkEn = '1' then
 				ALU_Op_r <= "0000";
@@ -1042,6 +1065,7 @@ begin
 
 	MC <= std_logic_vector(MCycle);
 	TS <= std_logic_vector(TState);
+	SS_NMI_o <= NMI_s;
 	DI_Reg <= DI;
 	HALT_n <= not Halt_FF;
 	BUSAK_n <= not BusAck;
@@ -1079,6 +1103,20 @@ begin
 			if DIRSet = '1' then
 				IntE_FF2 <= DIR(211);
 				IntE_FF1 <= DIR(210);
+				MCycle <= "001";
+				TState <= "000";
+				Pre_XY_F_M <= "000";
+				Halt_FF <= '0';
+				BusAck <= '0';
+				NMICycle <= '0';
+				IntCycle <= '0';
+				No_BTR <= '0';
+				Auto_Wait_t1 <= '0';
+				Auto_Wait_t2 <= '0';
+				M1_n <= '1';
+				BusReq_s <= '0';
+				NMI_s <= SS_NMI_i;
+				OldNMI_n := NMI_n;
 			else
 				if NMI_n = '0' and OldNMI_n = '1' then
 					NMI_s <= '1';

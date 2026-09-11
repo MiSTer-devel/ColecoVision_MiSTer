@@ -55,7 +55,12 @@ entity cv_clock is
     clk_en_10m7_i : in  std_logic;
     reset_n_i     : in  std_logic;
     clk_en_3m58_p_o : out std_logic;
-    clk_en_3m58_n_o : out std_logic
+    clk_en_3m58_n_o : out std_logic;
+
+    ss_wr_i         : in  std_logic := '0';
+    ss_a_i          : in  std_logic_vector(3 downto 0) := (others => '0');
+    ss_d_i          : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_o          : out std_logic_vector(7 downto 0)
   );
 
 end cv_clock;
@@ -80,7 +85,11 @@ begin
       clk_cnt_q     <= (others => '0');
 
     elsif clk_i'event and clk_i = '1' then
-      if clk_en_10m7_i = '1' then
+      if ss_wr_i = '1' then
+        if ss_a_i = x"0" then
+          clk_cnt_q <= unsigned(ss_d_i(1 downto 0));
+        end if;
+      elsif clk_en_10m7_i = '1' then
         if clk_cnt_q = 0 then
           clk_cnt_q <= "10";
         else
@@ -91,6 +100,8 @@ begin
   end process clk_cnt;
   --
   -----------------------------------------------------------------------------
+
+  ss_d_o <= "000000" & std_logic_vector(clk_cnt_q);
 
   clk_en_3m58_p_o <=   clk_en_10m7_i
                    when clk_cnt_q = 0 else

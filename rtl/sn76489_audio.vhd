@@ -130,6 +130,12 @@ port
    ; noise_o            : out    unsigned(11 downto 0)
    ; mix_audio_o        : out    unsigned(13 downto 0)
    ; pcm14s_o           : out    unsigned(13 downto 0)
+
+   ; ss_frz_i           : in     std_logic := '0'
+   ; ss_wr_i            : in     std_logic := '0'
+   ; ss_a_i             : in     std_logic_vector(4 downto 0) := (others => '0')
+   ; ss_d_i             : in     std_logic_vector(7 downto 0) := (others => '0')
+   ; ss_d_o             : out    std_logic_vector(7 downto 0)
 );
 end sn76489_audio;
 
@@ -223,6 +229,24 @@ architecture rtl of sn76489_audio is
    signal level_c_s           : unsigned(11 downto 0);
    signal level_n_s           : unsigned(11 downto 0);
 
+   function ss_io2slv(st : io_state_t) return std_logic_vector is
+   begin
+      case st is
+         when IO_IDLE => return "00";
+         when IO_OP   => return "01";
+         when IO_WAIT => return "10";
+      end case;
+   end;
+
+   function ss_slv2io(v : std_logic_vector(1 downto 0)) return io_state_t is
+   begin
+      case v is
+         when "01"   => return IO_OP;
+         when "10"   => return IO_WAIT;
+         when others => return IO_IDLE;
+      end case;
+   end;
+
    -- DAC.
    signal dac_a_r             : unsigned(11 downto 0) := (others => '0');
    signal dac_b_r             : unsigned(11 downto 0) := (others => '0');
@@ -291,6 +315,40 @@ architecture rtl of sn76489_audio is
 begin
 
    -- Register the input data at the full clock rate.
+   --
+   ss_read : process
+   ( ss_a_i, reg_addr_r
+   , ch_a_period_r, ch_a_level_r, ch_b_period_r, ch_b_level_r
+   , ch_c_period_r, ch_c_level_r
+   , noise_level_r, noise_ctrl_r, noise_shift_r, noise_rst_r, noise_lfsr_r
+   , io_state_r, io_cnt_r
+   ) begin
+      case ss_a_i is
+      when "00000" => ss_d_o <= "00000" & std_logic_vector(reg_addr_r);
+      when "00001" => ss_d_o <= std_logic_vector(ch_a_period_r(7 downto 0));
+      when "00010" => ss_d_o <= "000000" & std_logic_vector(ch_a_period_r(9 downto 8));
+      when "00011" => ss_d_o <= std_logic_vector(ch_a_level_r(7 downto 0));
+      when "00100" => ss_d_o <= "0000" & std_logic_vector(ch_a_level_r(11 downto 8));
+      when "00101" => ss_d_o <= std_logic_vector(ch_b_period_r(7 downto 0));
+      when "00110" => ss_d_o <= "000000" & std_logic_vector(ch_b_period_r(9 downto 8));
+      when "00111" => ss_d_o <= std_logic_vector(ch_b_level_r(7 downto 0));
+      when "01000" => ss_d_o <= "0000" & std_logic_vector(ch_b_level_r(11 downto 8));
+      when "01001" => ss_d_o <= std_logic_vector(ch_c_period_r(7 downto 0));
+      when "01010" => ss_d_o <= "000000" & std_logic_vector(ch_c_period_r(9 downto 8));
+      when "01011" => ss_d_o <= std_logic_vector(ch_c_level_r(7 downto 0));
+      when "01100" => ss_d_o <= "0000" & std_logic_vector(ch_c_level_r(11 downto 8));
+      when "01101" => ss_d_o <= std_logic_vector(noise_level_r(7 downto 0));
+      when "01110" => ss_d_o <= "0000" & std_logic_vector(noise_level_r(11 downto 8));
+      when "01111" => ss_d_o <= "0000" & noise_rst_r & noise_ctrl_r &
+                                std_logic_vector(noise_shift_r);
+      when "10000" => ss_d_o <= noise_lfsr_r(7 downto 0);
+      when "10001" => ss_d_o <= '0' & noise_lfsr_r(14 downto 8);
+      when "10010" => ss_d_o <= '0' & ss_io2slv(io_state_r) &
+                                std_logic_vector(io_cnt_r);
+      when others  => ss_d_o <= (others => '0');
+      end case;
+   end process ss_read;
+
    process ( clk_i ) begin
    if rising_edge(clk_i) then
       ce_n_r  <= ce_n_i;
@@ -366,7 +424,14 @@ begin
    ( clk_i, en_clk_psg_i
    ) begin
    if rising_edge(clk_i) then
-      if en_clk_psg_i = '1' then
+      if ss_wr_i = '1' then
+         if ss_a_i = "10010" then
+            io_state_r <= ss_slv2io(ss_d_i(6 downto 5));
+            io_cnt_r   <= unsigned(ss_d_i(4 downto 0));
+         end if;
+      elsif ss_frz_i = '1' then
+         null;
+      elsif en_clk_psg_i = '1' then
          io_state_r  <= io_state_x;
          io_cnt_r    <= io_cnt_x;
       end if;
@@ -484,7 +549,33 @@ begin
    ( clk_i, en_clk_psg_i
    ) begin
    if rising_edge(clk_i) then
-      if en_clk_psg_i = '1' then
+      if ss_wr_i = '1' then
+         case ss_a_i is
+         when "00000" => reg_addr_r <= unsigned(ss_d_i(2 downto 0));
+         when "00001" => ch_a_period_r(7 downto 0) <= unsigned(ss_d_i);
+         when "00010" => ch_a_period_r(9 downto 8) <= unsigned(ss_d_i(1 downto 0));
+         when "00011" => ch_a_level_r (7 downto 0) <= unsigned(ss_d_i);
+         when "00100" => ch_a_level_r(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+         when "00101" => ch_b_period_r(7 downto 0) <= unsigned(ss_d_i);
+         when "00110" => ch_b_period_r(9 downto 8) <= unsigned(ss_d_i(1 downto 0));
+         when "00111" => ch_b_level_r (7 downto 0) <= unsigned(ss_d_i);
+         when "01000" => ch_b_level_r(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+         when "01001" => ch_c_period_r(7 downto 0) <= unsigned(ss_d_i);
+         when "01010" => ch_c_period_r(9 downto 8) <= unsigned(ss_d_i(1 downto 0));
+         when "01011" => ch_c_level_r (7 downto 0) <= unsigned(ss_d_i);
+         when "01100" => ch_c_level_r(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+         when "01101" => noise_level_r(7 downto 0) <= unsigned(ss_d_i);
+         when "01110" => noise_level_r(11 downto 8) <= unsigned(ss_d_i(3 downto 0));
+         when "01111" => noise_shift_r <= unsigned(ss_d_i(1 downto 0));
+                         noise_ctrl_r  <= ss_d_i(2);
+                         noise_rst_r   <= ss_d_i(3);
+         when others  => null;
+         end case;
+
+      elsif ss_frz_i = '1' then
+         null;
+
+      elsif en_clk_psg_i = '1' then
 
          noise_rst_r <= noise_rst_x;
 
@@ -766,8 +857,16 @@ begin
    ) begin
    if rising_edge(clk_i) then
 
+      if ss_wr_i = '1' then
+         if    ss_a_i = "10000" then noise_lfsr_r(7 downto 0)  <= ss_d_i;
+         elsif ss_a_i = "10001" then noise_lfsr_r(14 downto 8) <= ss_d_i(6 downto 0);
+         end if;
+
+      elsif ss_frz_i = '1' then
+         null;
+
       -- ** NOTE: This reset is active high.
-      if noise_rst_r = '1' then
+      elsif noise_rst_r = '1' then
          noise_cnt_r  <= (others => '0');
          noise_ff_r   <= '1';
          noise_lfsr_r <= b"100_0000_0000_0000";

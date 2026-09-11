@@ -108,7 +108,12 @@ entity vdp18_core is
     blank_n_o     : out std_logic;
     hblank_o      : out std_logic;
     vblank_o      : out std_logic;
-    comp_sync_n_o : out std_logic
+    comp_sync_n_o : out std_logic;
+    ss_frz_i      : in  std_logic := '0';
+    ss_wr_i       : in  std_logic := '0';
+    ss_a_i        : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_i        : in  std_logic_vector(7 downto 0) := (others => '0');
+    ss_d_o        : out std_logic_vector(7 downto 0)
   );
 
 end vdp18_core;
@@ -173,6 +178,13 @@ architecture struct of vdp18_core is
 
   signal irq_s            : boolean;
 
+  signal ss_wr_cpuio_s    : std_logic;
+  signal ss_wr_horvert_s  : std_logic;
+  signal ss_wr_clkgen_s   : std_logic;
+  signal ss_d_cpuio_s     : std_logic_vector(7 downto 0);
+  signal ss_d_horvert_s   : std_logic_vector(7 downto 0);
+  signal ss_d_clkgen_s    : std_logic_vector(7 downto 0);
+
   signal blank_n          : boolean;
   signal hblank_n          : boolean;
   signal vblank_n          : boolean;
@@ -195,9 +207,21 @@ begin
       clk_en_10m7_i => clk_en_10m7_i,
       reset_i       => reset_s,
       clk_en_5m37_o => clk_en_5m37_s,
-      clk_en_2m68_o => open
+      clk_en_2m68_o => open,
+      ss_wr_i       => ss_wr_clkgen_s,
+      ss_a_i        => ss_a_i(3 downto 0),
+      ss_d_i        => ss_d_i,
+      ss_d_o        => ss_d_clkgen_s
     );
 
+  ss_wr_cpuio_s   <= ss_wr_i when ss_a_i(7 downto 4) = x"4" else '0';
+  ss_wr_horvert_s <= ss_wr_i when ss_a_i(7 downto 4) = x"5" else '0';
+  ss_wr_clkgen_s  <= ss_wr_i when ss_a_i(7 downto 4) = x"6" else '0';
+
+  ss_d_o <= ss_d_cpuio_s   when ss_a_i(7 downto 4) = x"4" else
+            ss_d_horvert_s when ss_a_i(7 downto 4) = x"5" else
+            ss_d_clkgen_s  when ss_a_i(7 downto 4) = x"6" else
+            (others => '0');
 
   -----------------------------------------------------------------------------
   -- Horizontal and Vertical Timing Generator
@@ -218,7 +242,12 @@ begin
       vsync_n_o     => vsync_n_s,
       blank_o       => blank_s,
       hblank_o      => hblank_s,
-      vblank_o      => vblank_s
+      vblank_o      => vblank_s,
+      ss_frz_i      => ss_frz_i,
+      ss_wr_i       => ss_wr_horvert_s,
+      ss_a_i        => ss_a_i(3 downto 0),
+      ss_d_i        => ss_d_i,
+      ss_d_o        => ss_d_horvert_s
     );
 
   hsync_n_o     <= hsync_n_s;
@@ -286,7 +315,12 @@ begin
       reg_col1_o    => reg_col1_s,
       reg_col0_o    => reg_col0_s,
       irq_i         => irq_s,
-      int_n_o       => int_n_o
+      int_n_o       => int_n_o,
+      ss_frz_i      => ss_frz_i,
+      ss_wr_i       => ss_wr_cpuio_s,
+      ss_a_i        => ss_a_i(3 downto 0),
+      ss_d_i        => ss_d_i,
+      ss_d_o        => ss_d_cpuio_s
     );
 
 
