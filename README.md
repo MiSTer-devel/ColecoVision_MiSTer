@@ -36,7 +36,7 @@ different points. It works for SG-1000 games as well as ColecoVision ones.
    `.sst`. It stays mounted until you pick another one. A brand new file is all
    empty slots, and an empty slot simply refuses to load.
 
-**Using it - one key per slot, no menu needed:**
+**From the keyboard - one key per slot, no menu needed:**
 
 | | |
 |---|---|
@@ -50,11 +50,23 @@ away each.
 > itself and hands the core the bare function key, so those two combinations
 > arrive as an ordinary load. This was measured on the hardware, not guessed.
 
-The menu still has **Save state** and **Load state**, and the two extra buttons
-**Save state** and **Load state** at the bottom of the controller mapping list
-can be mapped to any spare pad buttons. Neither a menu entry nor a button
-carries a slot number, so all four act on the slot a function key touched last
-- slot 1 until you press one.
+**From a pad, all eight slots too.** Map **Savestates** - the last entry in the
+controller mapping list - to a spare button, then hold it down:
+
+| | |
+|---|---|
+| **LEFT / RIGHT** | pick the slot, 1 to 8 |
+| **DOWN** | save into it |
+| **UP** | load from it |
+
+While that button is held the console sees nothing at all from that pad, so you
+cannot nudge the game while picking a slot. Hold it on its own for a moment and
+the controls are spelled out on screen.
+
+**You are told what happened.** Every save, load and slot change prints a line
+on screen - *Saved to slot 3*, *Loaded slot 3*, *Slot 4* - so eight slots do not
+have to be kept in your head. The **Savestate slot** entry in the menu follows
+along, and setting it there works too.
 
 Nothing fires while the OSD is open, so browsing the menu cannot save or load by
 accident.

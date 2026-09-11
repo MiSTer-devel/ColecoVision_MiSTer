@@ -72,11 +72,23 @@ parameter CONF_STR = {
 	"O45,RAM Size,1KB,8KB,SGM;",
 	"-;",
 	"S0,SST,Savestate file;",
+	"OCE,Savestate slot,1,2,3,4,5,6,7,8;",
 	"RF,Save state (Shift+F1-F8);",
 	"RG,Load state (F1-F8);",
 	"-;",
 	"R0,Reset;",
-	"J1,Fire 1,Fire 2,*,#,0,1,2,3,4,5,6,7,8,9,Purple Tr,Blue Tr,Save state,Load state;",
+	"J1,Fire 1,Fire 2,*,#,0,1,2,3,4,5,6,7,8,9,Purple Tr,Blue Tr,Savestates;",
+	"I,",
+	"Slot=LEFT/RIGHT  Save=DOWN  Load=UP,",
+	"Slot 1,","Slot 2,","Slot 3,","Slot 4,","Slot 5,","Slot 6,","Slot 7,","Slot 8,",
+	"Saved to slot 1,","Loaded slot 1,",
+	"Saved to slot 2,","Loaded slot 2,",
+	"Saved to slot 3,","Loaded slot 3,",
+	"Saved to slot 4,","Loaded slot 4,",
+	"Saved to slot 5,","Loaded slot 5,",
+	"Saved to slot 6,","Loaded slot 6,",
+	"Saved to slot 7,","Loaded slot 7,",
+	"Saved to slot 8,","Loaded slot 8;",
 	"V,v",`BUILD_DATE
 };
 
@@ -105,8 +117,10 @@ end
 
 /////////////////  HPS  ///////////////////////////
 
-wire [31:0] status;
-wire  [1:0] buttons;
+wire [127:0] status;
+wire   [1:0] buttons;
+
+wire [127:0] status_in = {status[127:15], ss_slot, status[11:0]};
 
 wire [31:0] joy0, joy1;
 
@@ -139,6 +153,10 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 	.buttons(buttons),
 	.status(status),
+	.status_in(status_in),
+	.status_set(ss_status_upd),
+	.info_req(ss_info_req),
+	.info(ss_info),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -294,8 +312,12 @@ wire [7:0] R,G,B;
 wire hblank, vblank;
 wire hsync, vsync;
 
-wire [31:0] joya = status[3] ? joy1 : joy0;
-wire [31:0] joyb = status[3] ? joy0 : joy1;
+wire [31:0] joy0_m = joy0[20] ? 32'd0 : joy0;
+wire [31:0] joy1_m = joy1[20] ? 32'd0 : joy1;
+wire [31:0] joy_ss = (joy0[20] ? joy0 : 32'd0) | (joy1[20] ? joy1 : 32'd0);
+
+wire [31:0] joya = status[3] ? joy1_m : joy0_m;
+wire [31:0] joyb = status[3] ? joy0_m : joy1_m;
 
 cv_console console
 (
@@ -410,19 +432,29 @@ wire [13:0] ss_vram_a;
 reg         ss_mounted = 0;
 always @(posedge clk_sys) if(img_mounted) ss_mounted <= |img_size;
 
-wire       ss_key_save, ss_key_load;
+wire       ss_key_save, ss_key_load, ss_info_req, ss_status_upd;
 wire [2:0] ss_slot;
+wire [7:0] ss_info;
 
 savestate_keys savestate_keys
 (
 	.clk(clk_sys),
 	.enable(~OSD_STATUS),
 	.ps2_key(ps2_key),
-	.joy_save(joy0[20] | joy1[20]),
-	.joy_load(joy0[21] | joy1[21]),
+	.joy_ss(joy_ss[20]),
+	.joy_right(joy_ss[0]),
+	.joy_left(joy_ss[1]),
+	.joy_down(joy_ss[2]),
+	.joy_up(joy_ss[3]),
+	.menu_slot(status[14:12]),
+	.osd_save(status[15]),
+	.osd_load(status[16]),
 	.save(ss_key_save),
 	.load(ss_key_load),
-	.slot(ss_slot)
+	.slot(ss_slot),
+	.info_req(ss_info_req),
+	.info(ss_info),
+	.status_update(ss_status_upd)
 );
 
 savestate savestate
@@ -430,8 +462,8 @@ savestate savestate
 	.clk(clk_sys),
 	.reset(reset),
 
-	.save_req(status[15] | ss_key_save),
-	.load_req(status[16] | ss_key_load),
+	.save_req(ss_key_save),
+	.load_req(ss_key_load),
 	.slot(ss_slot),
 	.mounted(ss_mounted),
 	.readonly(img_readonly),
